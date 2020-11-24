@@ -5,6 +5,7 @@ __version__ = '0.1'
 __author__ = 'Dat Nguyen'
 
 from pyspark.sql import SparkSession
+from pyspark import SparkContext
 from models.CommonEvent import CommonEvent
 from datetime import datetime
 import json
@@ -13,9 +14,9 @@ parse the CSV line to CommonEvent object
 format of CSV line:
     Trade:
     TradeDate,RecordType,Symbol,ExecutionID,EventTime, Event Sequence Number,Exchange,Trade Price, Trade Size
-    
+
     Quote:
-    TradeDate, RecordType, Symbol,EventTime, Event Sequence Number,Exchange, BidPrice, BidSize, AskPrice, AskSize  
+    TradeDate, RecordType, Symbol,EventTime, Event Sequence Number,Exchange, BidPrice, BidSize, AskPrice, AskSize
 """
 
 
@@ -74,9 +75,9 @@ def parse_csv(line: str) -> CommonEvent:
         else:
             raise Exception
     except Exception as e:
-        event = CommonEvent()
-        event.partition = 'B'
-        event.original_line = line
+        event = CommonEvent('B', trade_dt=None, rec_type=None, symbol=None, event_time=None, event_seq_num=None, exchange=None,
+                                arrival_time=None,
+                                trade_price=None, trade_size=None, bid_price=None, bid_size=None, ask_price=None, ask_size=None,line=line)
         return event
 
 
@@ -87,7 +88,7 @@ format of JSON line:
     TradeDate,RecordType,Symbol,ExecutionID,EventTime, Event Sequence Number,Exchange,Trade Price, Trade Size
 
     Quote:
-    TradeDate, RecordType, Symbol,EventTime, Event Sequence Number,Exchange, BidPrice, BidSize, AskPrice, AskSize  
+    TradeDate, RecordType, Symbol,EventTime, Event Sequence Number,Exchange, BidPrice, BidSize, AskPrice, AskSize
 """
 
 
@@ -159,11 +160,28 @@ def parse_json(line: str) -> CommonEvent:
 
 class Extract:
     def __init__(self):
+        app_name = 'Equity Market Data Analysis'
         self.spark = SparkSession \
             .builder \
             .master('local') \
-            .appName('Equity Market Data Analysis') \
+            .appName(app_name) \
             .getOrCreate()
+
+    """Extract data from csv data source
+    filepath: path to the data file. If the file is on Azure store, the file path is:
+    wasbs://<container-name>@<storage-account-name>.blob.core.windows.net/<path_in_container>"
+    parse_f: function for parse data. Must be 'parse_csv' or 'parse_json'
+    config_key: used when a file is on the cloud. If the file is on Azure store, the value is
+    "fs.azure.account.key.<storage-account-name>.blob.core.windows.net"
+    config_value: used when a file is on the cloud. If the file is on Azure store, the value is your account access key
+    """
+    def extract_csv(self, filepath:str, config_key:str, config_value:str):
+        self.spark.conf.set(config_key, config_value)
+        raw = self.spark.sparkContext.textFile(filepath)
+        #raw = self.spark.read.csv(filepath, comment='#')
+        parsed = raw.map(lambda line: parse_csv(line))
+        data = self.spark.createDataFrame(parsed)
+        data.write.partitionBy('partition').mode('overwrite').parquet('output_dir')
 
     """Extract data from data source
     filepath: path to the data file. If the file is on Azure store, the file path is:
@@ -173,9 +191,12 @@ class Extract:
     "fs.azure.account.key.<storage-account-name>.blob.core.windows.net"
     config_value: used when a file is on the cloud. If the file is on Azure store, the value is your account access key
     """
-    def extract_data(self, filepath:str, parse_f, config_key:str, config_value:str):
+    def extract_json(self, filepath:str, config_key:str, config_value:str):
         self.spark.conf.set(config_key, config_value)
-        raw = self.spark.textFile(filepath)
-        parsed = raw.map(lambda line: parse_f(line))
+        raw = self.spark.read.json(filepath)
+        parsed = raw.map(lambda line: parse_json(line))
         data = self.spark.createDataFrame(parsed)
         data.write.partitionBy('partition').mode('overwrite').parquet('output_dir')
+
+e = Extract()
+e.extract_csv('walmart_stock.csv', 'key','value')
