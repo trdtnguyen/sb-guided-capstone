@@ -143,3 +143,4 @@ root
 +--------------------+---------+--------+---------+--------+-------------+-------------------+---------+--------------------+---------+--------+-------+-------------------+-----------+----------+
 
 ```
+One interesting observation is that when using `map()` with the function parementer return the object, RDD automatically creates the header based on attribute names in our `CommonEvent` class in ascending alphabet order.
