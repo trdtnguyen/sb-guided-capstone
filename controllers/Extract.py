@@ -9,6 +9,8 @@ from pyspark import SparkContext
 from models.CommonEvent import CommonEvent
 from datetime import datetime
 import json
+import logging
+import sys
 """
 parse the CSV line to CommonEvent object
 format of CSV line:
@@ -167,6 +169,9 @@ class Extract:
             .master('local') \
             .appName(app_name) \
             .getOrCreate()
+        logging.basicConfig(stream=sys.stdout, level=logging.INFO,
+                                                    format='%(levelname)s - %(message)s')
+
 
     """Extract data from csv data source
     filepath: path to the data file. If the file is on Azure store, the file path is:
@@ -182,6 +187,9 @@ class Extract:
         #raw = self.spark.read.csv(filepath, comment='#')
         parsed = raw.map(lambda line: parse_csv(line))
         data = self.spark.createDataFrame(parsed)
+        logging.info(f'{type(data)}')
+        logging.info(data.printSchema())
+        logging.info(data.show())
         data.write.partitionBy('partition').mode('overwrite').parquet('output_dir')
 
     """Extract data from data source
@@ -197,6 +205,7 @@ class Extract:
         raw = self.spark.read.json(filepath)
         parsed = raw.map(lambda line: parse_json(line))
         data = self.spark.createDataFrame(parsed)
+        logging.info(f'{type(data)}')
         data.write.partitionBy('partition').mode('overwrite').parquet('output_dir')
 
 e = Extract()

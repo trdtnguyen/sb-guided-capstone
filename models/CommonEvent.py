@@ -43,3 +43,12 @@ class CommonEvent:
         self.ask_price = ask_price
         self.ask_size = ask_size
         self.original_line = line
+    def __str__(self):
+        result = ''
+        if self.rec_type in ['T', 'Q']:
+            result += f"({self.trade_dt.strftime('%Y-%m-%d')}, {self.rec_type}, {self.symbol}, {self.event_time.strftime('%Y-%m-%d')}, \
+                        {self.exchange}, {self.event_seq_num}, {self.arrival_time.strftime('%Y-%m-%d')}, {self.trade_price}, \
+                        {self.trade_size}, {self.bid_price}, {self.bid_size}, {self.ask_price}, {self.ask_size} "
+        else:
+            result += self.original_line
+        return result
