@@ -86,3 +86,21 @@ and extract json file:
          data = self.spark.createDataFrame(parsed)
          data.write.partitionBy('partition').mode('overwrite').parquet('output_dir')
 ```
+
+To test the digestion process run:
+```
+$ python controllers/Extract.py
+```
+
+As the results, parquet files are created in output directory as:
+```
+output_dir/
+├── partition=B
+│   └── part-00000-356a74e9-e5e0-4a44-9e37-ea25f28af432.c000.snappy.parquet
+├── partition=Q
+│   └── part-00000-356a74e9-e5e0-4a44-9e37-ea25f28af432.c000.snappy.parquet
+├── partition=T
+│   └── part-00000-356a74e9-e5e0-4a44-9e37-ea25f28af432.c000.snappy.parquet
+└── _SUCCESS
+
+```
