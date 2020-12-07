@@ -86,3 +86,61 @@ and extract json file:
          data = self.spark.createDataFrame(parsed)
          data.write.partitionBy('partition').mode('overwrite').parquet('output_dir')
 ```
+
+To test the digestion process run:
+```
+$ python controllers/Extract.py
+```
+
+As the results, parquet files are created in output directory as:
+```
+output_dir/
+├── partition=B
+│   └── part-00000-356a74e9-e5e0-4a44-9e37-ea25f28af432.c000.snappy.parquet
+├── partition=Q
+│   └── part-00000-356a74e9-e5e0-4a44-9e37-ea25f28af432.c000.snappy.parquet
+├── partition=T
+│   └── part-00000-356a74e9-e5e0-4a44-9e37-ea25f28af432.c000.snappy.parquet
+└── _SUCCESS
+
+```
+### Developer Note:
+* In `extract_csv()` funciton, we use `.map()` funciton of `RDD` with `lambda` function syntax that apply `parse_csv(line)` for each item in the `raw` RDD. The return type of `parse_csv()` is `CommonEvent` object. The `parsed` variable has type as `PipelineRDD`.
+* We then convert `PipelineRDD` to `DataFrame` using `spark.createDataFrame(parsed)`. The output of `data.printSchema()` would be:
+
+```
+root
+ |-- arrival_time: timestamp (nullable = true)
+ |-- ask_price: double (nullable = true)
+ |-- ask_size: long (nullable = true)
+ |-- bid_price: double (nullable = true)
+ |-- bid_size: long (nullable = true)
+ |-- event_seq_num: long (nullable = true)
+ |-- event_time: timestamp (nullable = true)
+ |-- exchange: string (nullable = true)
+ |-- original_line: string (nullable = true)
+ |-- partition: string (nullable = true)
+ |-- rec_type: string (nullable = true)
+ |-- symbol: string (nullable = true)
+ |-- trade_dt: timestamp (nullable = true)
+ |-- trade_price: double (nullable = true)
+ |-- trade_size: long (nullable = true)
+
+```
+
+* The output of `data.show()` would be:
+```
++--------------------+---------+--------+---------+--------+-------------+-------------------+---------+--------------------+---------+--------+-------+-------------------+-----------+----------+
+|        arrival_time|ask_price|ask_size|bid_price|bid_size|event_seq_num|         event_time| exchange|       original_line|partition|rec_type| symbol|           trade_dt|trade_price|trade_size|
++--------------------+---------+--------+---------+--------+-------------+-------------------+---------+--------------------+---------+--------+-------+-------------------+-----------+----------+
+|                null|     null|    null|     null|    null|         null|               null|     null|#TradeDate,Record...|        B|    null|   null|               null|       null|      null|
+|2020-12-07 13:10:...|      0.0|       0|      0.0|       0|            1|2020-11-23 00:00:00|Exchange1|                    |        T|       T|Symbol1|2020-01-01 00:00:00|  59.970001|        12|
+|2020-12-07 13:10:...|      0.0|       0|      0.0|       0|            2|2020-11-23 00:00:00|Exchange1|                    |        T|       T|Symbol2|2020-01-01 00:00:00|    134.213|       120|
+|2020-12-07 13:10:...|      0.0|       0|      0.0|       0|            3|2020-11-23 00:00:00|Exchange2|                    |        T|       T|Symbol3|2020-01-01 00:00:00|    10.4712|      1301|
+|2020-12-07 13:10:...|   58.231|      17|  61.1301|      20|            4|2020-11-23 00:00:00|Exchange1|                    |        Q|       Q|Symbol1|2020-01-01 00:00:00|        0.0|         0|
+|2020-12-07 13:10:...|   58.231|      17|  61.1301|      20|            4|2020-11-23 00:00:00|Exchange1|                    |        Q|       Q|Symbol2|2020-01-01 00:00:00|        0.0|         0|
+|                null|     null|    null|     null|    null|         null|               null|     null|2020-01-01,Q,Symb...|        B|    null|   null|               null|       null|      null|
++--------------------+---------+--------+---------+--------+-------------+-------------------+---------+--------------------+---------+--------+-------+-------------------+-----------+----------+
+
+```
+One interesting observation is that when using `map()` with the function parementer return the object, RDD automatically creates the header based on attribute names in our `CommonEvent` class in ascending alphabet order.
