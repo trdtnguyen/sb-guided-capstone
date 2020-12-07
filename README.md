@@ -59,3 +59,30 @@ This project extract data from stock trades and stock quotes data source on MS A
  2020-01-01,Q,Symbol2,2020-11-23,4,Exchange1, 61,1301, 20, 58.231, 17
  2020-01-01,Q,Symbol2,2020-11-23,4,Exchange1, 61,1301, 20,
 ```
+Note that different record types (`T` for trade and `Q` for quote) have different line format.
+## Digestion Process
+This is the firs step in the project to extract data from datasources, cleaning and transform the data to parquet files using Apache Spark. The details are:
+* Although trade data and quote data have different format, they share common columns such as `TradeDate`, `RecordType`, `Symbol`, etc. So we create a dimentional table `CommonEvent` to combine both data type into one table.
+* Implement `CommonEvent` class in Python that represent the `CommonEvent` table. We use this module to capture the extracted data during digestion process.
+* Implement `Extract` module to extract data from CSV, JSON format to parquet files and locate those files in partition in HDFS.
+
+The simple code for digesting CSV file is:
+```
+ def extract_csv(self, filepath:str, config_key:str, config_value:str):
+         self.spark.conf.set(config_key, config_value)
+         raw = self.spark.sparkContext.textFile(filepath)
+         #raw = self.spark.read.csv(filepath, comment='#')
+         parsed = raw.map(lambda line: parse_csv(line))
+         data = self.spark.createDataFrame(parsed)
+         data.write.partitionBy('partition').mode('overwrite').parquet('output_dir')
+```
+and extract json file:
+
+```
+ def extract_json(self, filepath:str, config_key:str, config_value:str):
+         self.spark.conf.set(config_key, config_value)
+         raw = self.spark.read.json(filepath)
+         parsed = raw.map(lambda line: parse_json(line))
+         data = self.spark.createDataFrame(parsed)
+         data.write.partitionBy('partition').mode('overwrite').parquet('output_dir')
+```
