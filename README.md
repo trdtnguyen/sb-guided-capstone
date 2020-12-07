@@ -104,3 +104,26 @@ output_dir/
 └── _SUCCESS
 
 ```
+### Developer Note:
+* In `extract_csv()` funciton, we use `.map()` funciton of `RDD` with `lambda` function syntax that apply `parse_csv(line)` for each item in the `raw` RDD. The return type of `parse_csv()` is `CommonEvent` object. The `parsed` variable has type as `PipelineRDD`.
+* We then convert `PipelineRDD` to `DataFrame` using `spark.createDataFrame(parsed)`. The output of `data.printSchema()` would be:
+
+```
+root
+ |-- arrival_time: timestamp (nullable = true)
+ |-- ask_price: double (nullable = true)
+ |-- ask_size: long (nullable = true)
+ |-- bid_price: double (nullable = true)
+ |-- bid_size: long (nullable = true)
+ |-- event_seq_num: long (nullable = true)
+ |-- event_time: timestamp (nullable = true)
+ |-- exchange: string (nullable = true)
+ |-- original_line: string (nullable = true)
+ |-- partition: string (nullable = true)
+ |-- rec_type: string (nullable = true)
+ |-- symbol: string (nullable = true)
+ |-- trade_dt: timestamp (nullable = true)
+ |-- trade_price: double (nullable = true)
+ |-- trade_size: long (nullable = true)
+
+```
