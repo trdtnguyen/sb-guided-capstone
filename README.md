@@ -47,3 +47,15 @@ bid_size | Integer | Bid Size (get from Quote)
 ask_price | Decimal | Ask Price (get from Quote)
 ask_size | Integer | Ask Price (get from Quote)
 partition | String | 'T' for Trade records, 'Q' for quote records, 'B' for bad format record
+
+## Data Sources
+This project extract data from stock trades and stock quotes data source on MS Azure with two format CSV and JSON. A sample CSV file would look like:
+```
+ #TradeDate,RecordType,Symbol,ExecutionID,EventTime,EventSeqNum,Exchange,TradePrice,TradeSize
+ 2020-01-01,T,Symbol1,1,2020-11-23,1,Exchange1, 59.970001,12
+ 2020-01-01,T,Symbol2,2,2020-11-23,2,Exchange1, 134.213,120
+ 2020-01-01,T,Symbol3,3,2020-11-23,3,Exchange2, 10.4712,1301
+ 2020-01-01,Q,Symbol1,2020-11-23,4,Exchange1, 61,1301, 20, 58.231, 17
+ 2020-01-01,Q,Symbol2,2020-11-23,4,Exchange1, 61,1301, 20, 58.231, 17
+ 2020-01-01,Q,Symbol2,2020-11-23,4,Exchange1, 61,1301, 20,
+```
