@@ -148,6 +148,7 @@ def parse_json(line: str) -> CommonEvent:
                                 arrival_time,
                                 trade_price, trade_size, bid_price, bid_size, ask_price, ask_size,
                                 line)
+            print(event)
             return event
         else:
             raise Exception
