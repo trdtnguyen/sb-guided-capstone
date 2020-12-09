@@ -60,7 +60,10 @@ def parse_csv(line: str) -> CommonEvent:
             event_time = datetime.strptime(record[3], '%Y-%m-%d')
             event_seq_num = int(record[4])
             exchange = record[5]
+            # To test the duplicate records, we increase 1 second for each later row
+            #arrival_time = datetime.now()
             arrival_time = datetime.now()
+            arrival_time = arrival_time + datetime.timedelta(0,1,10) # days, seconds, miliseconds
             trade_price = 0.0
             trade_size = 0
             bid_price = float(record[6])
@@ -206,7 +209,8 @@ class Extract:
         parsed = raw.map(lambda line: parse_json(line))
         data = self.spark.createDataFrame(parsed)
         logging.info(f'{type(data)}')
-        data.write.partitionBy('partition').mode('overwrite').parquet('output_dir')
+        #data.write.partitionBy('partition').mode('overwrite').parquet('output_dir')
+        data.write.partitionBy('partition').mode('append').parquet('output_dir')
 
 e = Extract()
 e.extract_csv('walmart_stock.csv', 'key','value')
