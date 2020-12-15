@@ -144,3 +144,45 @@ root
 
 ```
 One interesting observation is that when using `map()` with the function paramenter return the object, Spark RDD automatically creates the header based on attribute names in our `CommonEvent` class in ascending alphabet order.
+
+## End-of-day Data Load
+In the previous stage, digestion process keep update in-day data into parquet files located in temporary locations i.e., `output_dir`. This stage load and clean data as following steps:
+* Read parquet files from temporary location
+* Select the necessary columns for `trade` and `quote` records
+* Apply data correction
+* Write the dataset back to parquet files on Azure Blob Storage
+
+### Why applying data correction is needed?
+Trade and quote data are updated periodically in a day by Exchange. For each row, the composite key is `trade_dt`, `symbol`, `exchange`, `event_tm`,  `event_sq_num`. During the day, the Exchange could update data with the same composite key to correct the previous one. So in our digested data, there are rows with the same composite key but different prices.
+
+### How to handle duplicate composite key records?
+* Choose `arrival_time` as the ***unique key*** in `CommonEvent` table.
+```python
+#Read Trade Partition Dataset from temporary location
+trade_common = self.spark.read.parquet(filepath)
+# select necessary of trade records.
+trade_df = trade_common.select("arrival_time", "trade_dt", "symbol", "exchange", "event_time", "event_seq_num", "trade_price", "trade_size")
+```
+* Sort the records by `arrivel_time` and aggregate duplicated composite key rows into a group using `pyspark.sql.functions.collect_set()`
+```python
+# composite key: trade_dt, symbol, exchange, event_time, event_seq_num
+trade_grouped_df = trade_df.orderBy("arrival_time") \
+         .groupBy("trade_dt", "symbol", "exchange", "event_time", "event_seq_num") \
+         .agg(F.collect_set("arrival_time").alias("arrival_times"), F.collect_set("trade_price").alias("trade_prices"), F.collect_set("trade_size").alias("trade_sizes")
+```
+
+* Make a new column by selecting the first item in each aggregated group in the previous step. This column is the latest price we need to keep, the remains are discard.
+
+```python
+trade_removed_dup_df = trade_grouped_df \
+         .withColumn("arrival_time", F.slice(trade_grouped_df["arrival_times"], 1, 1)[0]) \
+         .withColumn("trade_price", F.slice(trade_grouped_df["trade_prices"], 1, 1)[0]) \
+         .withColumn("trade_size", F.slice(trade_grouped_df["trade_sizes"], 1, 1)[0])
+```
+* Discard unnessary columns
+```python
+trade_final_df = trade_removed_dup_df \
+         .drop(F.col("arrival_times")) \
+         .drop(F.col("trade_prices")) \
+         .drop(F.col("trade_sizes"))
+```
