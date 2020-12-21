@@ -7,7 +7,7 @@ __author__ = 'Dat Nguyen'
 from pyspark.sql import SparkSession
 from pyspark import SparkContext
 from models.CommonEvent import CommonEvent
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import logging
 import sys
@@ -27,6 +27,8 @@ def parse_csv(line: str) -> CommonEvent:
     record = line.split(',')
     try:
 
+        arrival_time = datetime.now()
+        arrival_time = arrival_time + timedelta(0,1,10) # days, seconds, miliseconds
         if record[record_type_pos] == 'T':
             # TradeDate,RecordType,Symbol,ExecutionID,EventTime, Event Sequence Number,Exchange,Trade Price, Trade Size
             partition = 'T'
@@ -36,7 +38,8 @@ def parse_csv(line: str) -> CommonEvent:
             event_time = datetime.strptime(record[4], '%Y-%m-%d')
             event_seq_num = int(record[5])
             exchange = record[6]
-            arrival_time = datetime.now()
+            #arrival_time = datetime.now()
+            #arrival_time = arrival_time + timedelta(0,1,10) # days, seconds, miliseconds
             trade_price = float(record[7])
             trade_size = int(record[8])
             bid_price = 0.0
@@ -49,6 +52,7 @@ def parse_csv(line: str) -> CommonEvent:
                                 arrival_time,
                                 trade_price, trade_size, bid_price, bid_size, ask_price, ask_size,
                                 line)
+            #print(event)
             return event
         elif record[record_type_pos] == 'Q':
             # TradeDate, RecordType, Symbol,EventTime, Event Sequence Number,Exchange, BidPrice, BidSize, AskPrice,
@@ -62,8 +66,7 @@ def parse_csv(line: str) -> CommonEvent:
             exchange = record[5]
             # To test the duplicate records, we increase 1 second for each later row
             #arrival_time = datetime.now()
-            arrival_time = datetime.now()
-            arrival_time = arrival_time + datetime.timedelta(0,1,10) # days, seconds, miliseconds
+            #arrival_time = arrival_time + datetime.timedelta(0,1,10) # days, seconds, miliseconds
             trade_price = 0.0
             trade_size = 0
             bid_price = float(record[6])
@@ -76,6 +79,7 @@ def parse_csv(line: str) -> CommonEvent:
                                 arrival_time,
                                 trade_price, trade_size, bid_price, bid_size, ask_price, ask_size,
                                 line)
+            #print(event)
             return event
         else:
             raise Exception
@@ -83,6 +87,7 @@ def parse_csv(line: str) -> CommonEvent:
         event = CommonEvent('B', trade_dt=None, rec_type=None, symbol=None, event_time=None, event_seq_num=None, exchange=None,
                                 arrival_time=None,
                                 trade_price=None, trade_size=None, bid_price=None, bid_size=None, ask_price=None, ask_size=None,line=line)
+        print('****** EXCEPTION in ***** ', line)
         return event
 
 
@@ -127,6 +132,7 @@ def parse_json(line: str) -> CommonEvent:
                                 arrival_time,
                                 trade_price, trade_size, bid_price, bid_size, ask_price, ask_size,
                                 line)
+            #print(event)
             return event
         elif record[record_type_pos] == 'Q':
             # TradeDate, RecordType, Symbol,EventTime, Event Sequence Number,Exchange, BidPrice, BidSize, AskPrice,
@@ -153,7 +159,7 @@ def parse_json(line: str) -> CommonEvent:
                                 arrival_time,
                                 trade_price, trade_size, bid_price, bid_size, ask_price, ask_size,
                                 line)
-            print(event)
+            #print(event)
             return event
         else:
             raise Exception

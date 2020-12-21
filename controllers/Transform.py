@@ -1,5 +1,10 @@
 """
-Transform data from temp parquet file
+Transform data from cleaned parquet files
+Read parquest files (output from Cleaning stage)
+Build an ETL job that calculates the following results for a given day
+- Latest trade price before the quote
+- Latest 30-minutes moving average trade price, before the quote
+- The bid/ask price movement from previous day's closing price
 """
 __version__ = '0.1'
 __author__ = 'Dat Nguyen'
@@ -23,40 +28,64 @@ class Transform:
         logging.basicConfig(stream=sys.stdout, level=logging.INFO,
                             format='%(levelname)s - %(message)s')
 
-    def data_correction_trade(self, filepath:str):
-        #Read Trade Partition Dataset from temporary location
-        trade_common = self.spark.read.parquet(filepath)
+    def create_trade_staging_table(self, basepath:str, date_str):
+        #Read Trade Partition Dataset from the output of the previous stage
+        df = self.spark.read.parquet(f'{basepath}/trade/{date_str}')
+        df.createOrReplaceTempView("trades")
 
-        # select necessary of trade records.
-        trade_df = trade_common.select("arrival_time", "trade_dt", "symbol", "exchange", "event_time", "event_seq_num", "trade_price", "trade_size")
-        trade_df.show()
+        # Read trade table with necessary columns and save as a temp view
+        df = spark.sql(f"SELECT symbol, exchange, event_time, event_seq_num, trade price
+                       FROM trades
+                       WHERE trade_dt = {date_str}
+                       ")
+        df.createOrReplaceTempView("tmp_trade_moving_avg")
 
-        # composite key: trade_dt, symbol, exchange, event_time, event_seq_num
-        #trade_grouped_df = trade_df.groupBy("trade_dt", "symbol", "exchange", "event_time", "event_seq_num")
-        trade_grouped_df = trade_df.orderBy("arrival_time") \
-        .groupBy("trade_dt", "symbol", "exchange", "event_time", "event_seq_num") \
-        .agg(F.collect_set("arrival_time").alias("arrival_times"), F.collect_set("trade_price").alias("trade_prices"), F.collect_set("trade_size").alias("trade_sizes"))
-        trade_grouped_df.show(truncate=False)
+        # Read trade table and compute the avg latest 30 minutes
+        moving_avg_df = self.spark.sql(f"
+                            SELECT symbol, exchange, event_time, event_seq_num, trade_price,
+                               AVG(trade_price) OVER (PARTITION BY symbol ORDER BY event_time DESC
+                               ROWS BETWEEN CURRENT ROW AND 29 FOLLOWING)  AS running_avg
+                            FROM tmp_trade_moving_avg
+                            ")
+        #Save the temp view into hive table for staging
+        moving_avg_df.write.saveAsTable("tmp_trade_moving_avg_table")
 
-        trade_removed_dup_df = trade_grouped_df \
-        .withColumn("arrival_time", F.slice(trade_grouped_df["arrival_times"], 1, 1)[0]) \
-        .withColumn("trade_price", F.slice(trade_grouped_df["trade_prices"], 1, 1)[0]) \
-        .withColumn("trade_size", F.slice(trade_grouped_df["trade_sizes"], 1, 1)[0])
+        #Get the previous date trade data
+        date = datetime.strptime(date_str, '%Y-%m-%d')
+        prev_date = date - timedelta(1,0,0) # days, seconds, millisecond
+        prev_date_str = prev_date.strftime('%Y-%m-%d')
 
-        trade_final_df = trade_removed_dup_df \
-        .drop(F.col("arrival_times")) \
-        .drop(F.col("trade_prices")) \
-        .drop(F.col("trade_sizes"))
+        # Read Trade partition dataset
+        df = self.spark.read.parquet(f'{basepath}/trade/{prev_date_str}')
+        df.createOrReplaceTempView("prev_trades")
 
-        trade_final_df.show(truncate=False)
+        df = spark.sql(f"SELECT symbol, exchange, event_time, event_seq_num, trade price
+                       FROM prev_trades
+                       WHERE trade_dt = {prev_date_str}
+                       ")
+        # create a temp view
+        df.createOrReplaceTempView("tmp_last_trade")
 
-        #trade_grouped_df = trade_grouped_df.orderBy("arrival_time")
-        #trade_grouped_df.show()
+        # Read trade table and compute the avg latest 30 minutes
+        last_pr_df = spark.sql(f" SELECT symbol, exchange, last_pr FROM
+                               (SELECT symbol, exchange, event_time, event_seq_num, trade_price,
+                               AVG(trade_price) OVER (ORDER BY event_time DESC
+                               ROWS BETWEEN CURRENT ROW AND 29 FOLLOWING) AS last_pr
+                               FROM tmp_last_trade)
+                               ")
+        last_pr_df.write.saveAsTable("tmp_last_trade_table")
 
-        #Remove rows with old data
+
+        # Read Quote partition dataset
+        # Remind that columns in quotes table are: arrival_time, trade_dt, symbol, exchange, event_time, event_seq_num, bid_price, bid_size, ask_price, ask_size
+        df = self.spark.read.parquet(f'{basepath}/quote/{date_str}')
+        df.createOrReplaceTempView("quotes")
 
 
-        #Write the remain data to parquet files
+
+
+
+
+
 
 t = Transform()
-t.data_correction_trade('output_dir/partition=T')
