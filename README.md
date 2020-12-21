@@ -268,17 +268,25 @@ DEF,Exchange1,"2020-12-20 10:20:00",3,21.12,20.45333417256673
 DEF,Exchange1,"2020-12-20 10:10:00",2,20.12,20.1200008392334
 DEF,Exchange1,"2020-12-20 10:00:00",1,20.12,20.1200008392334
 ```
-* Step 4: Filtering out the neccessary columns in `t2`
-```
-CREATE TEMPORARY TABLE last_moving_avg_tb AS
-SELECT symbol, exchange, last_pr
-FROM temp1;
-```
-The output is:
-```
-```
 
 * Step 4: Load ***quote*** data for the current day into a temp view `v2`. Remind that the column in `v2` are: `arrival_time`, `trade_dt`, `symbol`, `exchange`, `event_time`, `event_seq_num`, `bid_price`, `bid_size`, `ask_price`, `ask_size`.
+
+```
+SELECT * FROM quote WHERE trade_dt = '2020-12-21';
+```
+
+The output:
+```
+arrival_time,trade_dt,symbol,exchange,event_time,event_seq_num,bid_price,bid_size,ask_price,ask_size
+"2020-12-21 12:00:00","2020-12-21 00:00:00",ABC,Exchange1,"2020-12-21 10:00:00",1,20.12,120,21.57,110
+"2020-12-21 13:00:00","2020-12-21 00:00:00",ABC,Exchange1,"2020-12-21 10:10:00",2,20.12,120,20.57,111
+"2020-12-21 14:00:00","2020-12-21 00:00:00",ABC,Exchange1,"2020-12-21 10:20:00",3,21.12,125,19.57,113
+"2020-12-21 15:00:00","2020-12-21 00:00:00",ABC,Exchange1,"2020-12-21 10:30:00",4,21.12,125,19.57,113
+"2020-12-21 12:00:00","2020-12-21 00:00:00",DEF,Exchange1,"2020-12-21 10:00:00",1,20.12,120,21.57,110
+"2020-12-21 13:00:00","2020-12-21 00:00:00",DEF,Exchange1,"2020-12-21 10:10:00",2,20.12,120,20.57,111
+"2020-12-21 14:00:00","2020-12-21 00:00:00",DEF,Exchange1,"2020-12-21 10:20:00",3,21.12,125,19.57,113
+"2020-12-21 15:00:00","2020-12-21 00:00:00",DEF,Exchange1,"2020-12-21 10:30:00",4,21.12,125,19.57,113
+```
 
 * Union `t1` and `v2`
 
