@@ -193,7 +193,106 @@ trade_final_df = trade_removed_dup_df \
 In the previous stage, cleaning process removed unnecessary data, corrupted data and older data in a daily basic and save data in `trade` and `quote` directory in Azure Blob Storage. This stage loads data from the previous step into Spark and transform the data as following steps:
 
 * Step 1: Load ***trade*** data for the current day into a temp view `v1`.
+An sample output of `v1`:
+
+```
+arrival_time,trade_dt,symbol,exchange,event_time,event_seq_num,trade_price,trade_size
+"2020-12-20 12:00:00","2020-12-20 00:00:00",ABC,Exchange1,"2020-12-20 10:00:00",1,20.12,120
+"2020-12-20 13:00:00","2020-12-20 00:00:00",ABC,Exchange1,"2020-12-20 10:10:00",2,20.12,120
+"2020-12-20 14:00:00","2020-12-20 00:00:00",ABC,Exchange1,"2020-12-20 10:20:00",3,21.12,125
+"2020-12-20 15:00:00","2020-12-20 00:00:00",ABC,Exchange1,"2020-12-20 10:30:00",4,21.12,125
+"2020-12-20 12:00:00","2020-12-20 00:00:00",DEF,Exchange1,"2020-12-20 10:00:00",1,20.12,120
+"2020-12-20 13:00:00","2020-12-20 00:00:00",DEF,Exchange1,"2020-12-20 10:10:00",2,20.12,120
+"2020-12-20 14:00:00","2020-12-20 00:00:00",DEF,Exchange1,"2020-12-20 10:20:00",3,21.12,125
+"2020-12-20 15:00:00","2020-12-20 00:00:00",DEF,Exchange1,"2020-12-20 10:30:00",4,21.12,125
+"2020-12-21 12:00:00","2020-12-21 00:00:00",ABC,Exchange1,"2020-12-21 10:00:00",1,20.12,120
+"2020-12-21 13:00:00","2020-12-21 00:00:00",ABC,Exchange1,"2020-12-21 10:10:00",2,20.12,120
+"2020-12-21 14:00:00","2020-12-21 00:00:00",ABC,Exchange1,"2020-12-21 10:20:00",3,21.12,125
+"2020-12-21 15:00:00","2020-12-21 00:00:00",ABC,Exchange1,"2020-12-21 10:30:00",4,21.12,125
+"2020-12-21 12:00:00","2020-12-21 00:00:00",DEF,Exchange1,"2020-12-21 10:00:00",1,20.12,120
+"2020-12-21 13:00:00","2020-12-21 00:00:00",DEF,Exchange1,"2020-12-21 10:10:00",2,20.12,120
+"2020-12-21 14:00:00","2020-12-21 00:00:00",DEF,Exchange1,"2020-12-21 10:20:00",3,21.12,125
+"2020-12-21 15:00:00","2020-12-21 00:00:00",DEF,Exchange1,"2020-12-21 10:30:00",4,21.12,125
+
+```
 * Step 2: Aggreates trade prices within ***30-minutes sliding windows*** from `v1` and save the result in a temp table `t1`. The `t1` columns are: `symbol`, `exchange`, `event_time`, `event_seq_num`, `trade_price`, `running_avg`. `running_avg` is the average trade prices within a 30-minutes window.
-* Step 3: Repeat step 1 and step 2 for ***the day before*** of the current day and save the result in a temp table `t2`. The `t2` columns are: `symbol`, `exchange`, `last_price`. `last_price` is the average trade price within 30-minutes of the last window of the previous day.
+
+SQL statement:
+```sql
+DROP TABLE IF EXISTS moving_avg_tb;
+CREATE TEMPORARY TABLE moving_avg_tb AS
+SELECT symbol, exchange, event_time, event_seq_num, trade_price,
+AVG(trade_price) OVER (PARTITION BY symbol ORDER BY event_time DESC 
+				 ROWS BETWEEN CURRENT ROW AND 2 FOLLOWING) AS running_avg
+FROM trade
+WHERE trade_dt = '2020-12-21'
+;
+```
+
+An sample output of `t1`:
+
+```
+symbol,exchange,event_time,event_seq_num,trade_price,running_avg
+ABC,Exchange1,"2020-12-21 10:30:00",4,21.12,20.786667505900066
+ABC,Exchange1,"2020-12-21 10:20:00",3,21.12,20.45333417256673
+ABC,Exchange1,"2020-12-21 10:10:00",2,20.12,20.1200008392334
+ABC,Exchange1,"2020-12-21 10:00:00",1,20.12,20.1200008392334
+DEF,Exchange1,"2020-12-21 10:30:00",4,21.12,20.786667505900066
+DEF,Exchange1,"2020-12-21 10:20:00",3,21.12,20.45333417256673
+DEF,Exchange1,"2020-12-21 10:10:00",2,20.12,20.1200008392334
+DEF,Exchange1,"2020-12-21 10:00:00",1,20.12,20.1200008392334
+```
+
+* Step 3: Repeat step 1 and step 2 for ***the day before*** of the current day and save the result in a temp table `t2`.
+
+SQL statements:
+```
+DROP TABLE IF EXISTS temp1
+CREATE TEMPORARY TABLE temp1 AS
+SELECT symbol, exchange, event_time, event_seq_num, trade_price,
+AVG(trade_price) OVER (PARTITION BY symbol ORDER BY event_time DESC 
+				 ROWS BETWEEN CURRENT ROW AND 2 FOLLOWING) AS last_pr
+                 FROM trade
+                 WHERE trade_dt = '2020-12-20'
+;
+```
+The output:
+```sql
+symbol,exchange,event_time,event_seq_num,trade_price,last_pr
+ABC,Exchange1,"2020-12-20 10:30:00",4,21.12,20.786667505900066
+ABC,Exchange1,"2020-12-20 10:20:00",3,21.12,20.45333417256673
+ABC,Exchange1,"2020-12-20 10:10:00",2,20.12,20.1200008392334
+ABC,Exchange1,"2020-12-20 10:00:00",1,20.12,20.1200008392334
+DEF,Exchange1,"2020-12-20 10:30:00",4,21.12,20.786667505900066
+DEF,Exchange1,"2020-12-20 10:20:00",3,21.12,20.45333417256673
+DEF,Exchange1,"2020-12-20 10:10:00",2,20.12,20.1200008392334
+DEF,Exchange1,"2020-12-20 10:00:00",1,20.12,20.1200008392334
+```
+* Step 4: Filtering out the neccessary columns in `t2`
+```
+CREATE TEMPORARY TABLE last_moving_avg_tb AS
+SELECT symbol, exchange, last_pr
+FROM temp1;
+```
+The output is:
+```
+```
+
 * Step 4: Load ***quote*** data for the current day into a temp view `v2`. Remind that the column in `v2` are: `arrival_time`, `trade_dt`, `symbol`, `exchange`, `event_time`, `event_seq_num`, `bid_price`, `bid_size`, `ask_price`, `ask_size`.
-* Join `t1` and `v2`
+
+* Union `t1` and `v2`
+
+Column | Value
+-------|---------
+trade_dt | Value from corresponding records
+rec_type | “Q” for quotes, “T” for trades
+symbol | Value from corresponding records
+event_tm | Value from corresponding records
+event_seq_nb | From quotes, null for trades
+exchange  | Value from corresponding records
+bid_pr | From quotes, null for trades
+bid_size | From quotes, null for trades
+ask_pr | From quotes, null for trades
+ask_size | From quotes, null for trades
+trade_pr | From trades, null for quotes
+mov_avg_pr | From trades, null for quotes
