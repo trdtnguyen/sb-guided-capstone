@@ -145,12 +145,15 @@ root
 ```
 One interesting observation is that when using `map()` with the function paramenter return the object, Spark RDD automatically creates the header based on attribute names in our `CommonEvent` class in ascending alphabet order.
 
-## End-of-day Data Load
+## End-of-day Data Load (Cleaning)
 In the previous stage, digestion process keep update in-day data into parquet files located in temporary locations i.e., `output_dir`. This stage load and clean data as following steps:
 * Read parquet files from temporary location
 * Select the necessary columns for `trade` and `quote` records
-* Apply data correction
+* Apply data correction i.e., keep only the latest price and remove the older one.
 * Write the dataset back to parquet files on Azure Blob Storage
+
+* ***Input***: parquet files in `output_dir` partitioned by type (`T`, `Q`, 'B`)
+* ***Output***: parquet files in `trade` or `quote` directory for each day (e.g., `trade/trade-dt=2020-12-20`)
 
 ### Why applying data correction is needed?
 Trade and quote data are updated periodically in a day by Exchange. For each row, the composite key is `trade_dt`, `symbol`, `exchange`, `event_tm`,  `event_sq_num`. During the day, the Exchange could update data with the same composite key to correct the previous one. So in our digested data, there are rows with the same composite key but different prices.
@@ -186,3 +189,9 @@ trade_final_df = trade_removed_dup_df \
          .drop(F.col("trade_prices")) \
          .drop(F.col("trade_sizes"))
 ```
+## Analytical ETL
+In the previous stage, cleaning process removed unnecessary data, corrupted data and older data in a daily basic and save data in `trade` and `quote` directory in Azure Blob Storage. This stage loads data from the previous step into Spark and transform the data as following steps:
+
+* Step 1: Load ***trade*** data for the current day into a temp view `v1`.
+* Step 2: Aggreates trade prices within a 30-minutes sliding windows from `v1` and save the result in a temp table `t1`. The `t1` columns are: `symbol`, `exchange`, `event_time`, `event_seq_num`, `trade_price`, `running_avg`. `running_avg` is the average trade prices within 30 minutes window.
+* Repeat step 1 and step 2 for the day before of the current day and save the result in a temp table `t2`. The `t2` columns are: `symbol`, `exchange`, `last_price`. `last_price` is the average trade price within 30 minutes of the last window of the previous day.
