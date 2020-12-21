@@ -193,5 +193,7 @@ trade_final_df = trade_removed_dup_df \
 In the previous stage, cleaning process removed unnecessary data, corrupted data and older data in a daily basic and save data in `trade` and `quote` directory in Azure Blob Storage. This stage loads data from the previous step into Spark and transform the data as following steps:
 
 * Step 1: Load ***trade*** data for the current day into a temp view `v1`.
-* Step 2: Aggreates trade prices within a 30-minutes sliding windows from `v1` and save the result in a temp table `t1`. The `t1` columns are: `symbol`, `exchange`, `event_time`, `event_seq_num`, `trade_price`, `running_avg`. `running_avg` is the average trade prices within 30 minutes window.
-* Repeat step 1 and step 2 for the day before of the current day and save the result in a temp table `t2`. The `t2` columns are: `symbol`, `exchange`, `last_price`. `last_price` is the average trade price within 30 minutes of the last window of the previous day.
+* Step 2: Aggreates trade prices within ***30-minutes sliding windows*** from `v1` and save the result in a temp table `t1`. The `t1` columns are: `symbol`, `exchange`, `event_time`, `event_seq_num`, `trade_price`, `running_avg`. `running_avg` is the average trade prices within a 30-minutes window.
+* Step 3: Repeat step 1 and step 2 for ***the day before*** of the current day and save the result in a temp table `t2`. The `t2` columns are: `symbol`, `exchange`, `last_price`. `last_price` is the average trade price within 30-minutes of the last window of the previous day.
+* Step 4: Load ***quote*** data for the current day into a temp view `v2`. Remind that the column in `v2` are: `arrival_time`, `trade_dt`, `symbol`, `exchange`, `event_time`, `event_seq_num`, `bid_price`, `bid_size`, `ask_price`, `ask_size`.
+* Join `t1` and `v2`
