@@ -78,9 +78,15 @@ class Transform:
 
         # Read Quote partition dataset
         # Remind that columns in quotes table are: arrival_time, trade_dt, symbol, exchange, event_time, event_seq_num, bid_price, bid_size, ask_price, ask_size
-        df = self.spark.read.parquet(f'{basepath}/quote/{date_str}')
-        df.createOrReplaceTempView("quotes")
-
+        quote_df = self.spark.read.parquet(f'{basepath}/quote/{date_str}')
+        quote_df.createOrReplaceTempView("quotes")
+        # Filtering out the date
+        quote_df_filter = spark.sql(f"SELECT *
+                       FROM quotes
+                       WHERE trade_dt = {date_str}
+                       ")
+        quote_df_filter.createOrReplaceTempView("quotes_filtered")
+        # Union the quotes and tmp_trade_moving_avg_table
 
 
 
