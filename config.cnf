@@ -1,0 +1,5 @@
+[CORE]
+PROJECT_PATH=/home/dtn/sb-guided-capstone
+[DATA]
+DAILY_DATA_PATH=daily_data
+SOURCE_DATA_FILE=stock.csv
