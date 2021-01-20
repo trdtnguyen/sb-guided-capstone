@@ -29,6 +29,13 @@ Exchange | String
 ***Ask Price*** | Decimal
 ***Ask Size*** | Int
 
+***Note:***
+* The ***bid price*** refers to the highest price a buyer will pay for a security.
+* The ***ask price*** refers to the lowest price a seller will accept for a security.
+
+For example, company A wants to purchase 1,000 shares of XYZ stock at $10, and company B wants to sell 1,500 shares of XYZ at $10.25. The spread is the difference between the asking price of $10.25 and the bid price of $10, or 25 cents. An individual investor looking at this spread would then know that, if they want to sell 1,000 shares, they could do so at $10 by selling to A. Conversely, the same investor would know that they could purchase 1,500 shares from B at $10.25. 
+
+
 ### Common Event (dimentional)
 Data models in Trade and Quote share some common columns. We combine them into one data model called Common Event as below:
 Column | Type | Note
@@ -198,20 +205,20 @@ An sample output of `v1`:
 ```
 arrival_time,trade_dt,symbol,exchange,event_time,event_seq_num,trade_price,trade_size
 "2020-12-20 12:00:00","2020-12-20 00:00:00",ABC,Exchange1,"2020-12-20 10:00:00",1,20.12,120
-"2020-12-20 13:00:00","2020-12-20 00:00:00",ABC,Exchange1,"2020-12-20 10:10:00",2,20.12,120
-"2020-12-20 14:00:00","2020-12-20 00:00:00",ABC,Exchange1,"2020-12-20 10:20:00",3,21.12,125
-"2020-12-20 15:00:00","2020-12-20 00:00:00",ABC,Exchange1,"2020-12-20 10:30:00",4,21.12,125
+"2020-12-20 13:00:00","2020-12-20 00:00:00",ABC,Exchange1,"2020-12-20 10:10:00",2,22.32,130
+"2020-12-20 14:00:00","2020-12-20 00:00:00",ABC,Exchange1,"2020-12-20 10:20:00",3,21.2,125
+"2020-12-20 15:00:00","2020-12-20 00:00:00",ABC,Exchange1,"2020-12-20 10:30:00",4,25.12,100
 "2020-12-20 12:00:00","2020-12-20 00:00:00",DEF,Exchange1,"2020-12-20 10:00:00",1,20.12,120
 "2020-12-20 13:00:00","2020-12-20 00:00:00",DEF,Exchange1,"2020-12-20 10:10:00",2,20.12,120
 "2020-12-20 14:00:00","2020-12-20 00:00:00",DEF,Exchange1,"2020-12-20 10:20:00",3,21.12,125
 "2020-12-20 15:00:00","2020-12-20 00:00:00",DEF,Exchange1,"2020-12-20 10:30:00",4,21.12,125
-"2020-12-21 12:00:00","2020-12-21 00:00:00",ABC,Exchange1,"2020-12-21 10:00:00",1,20.12,120
-"2020-12-21 13:00:00","2020-12-21 00:00:00",ABC,Exchange1,"2020-12-21 10:10:00",2,20.12,120
-"2020-12-21 14:00:00","2020-12-21 00:00:00",ABC,Exchange1,"2020-12-21 10:20:00",3,21.12,125
+"2020-12-21 12:00:00","2020-12-21 00:00:00",ABC,Exchange1,"2020-12-21 10:00:00",1,24.12,127
+"2020-12-21 13:00:00","2020-12-21 00:00:00",ABC,Exchange1,"2020-12-21 10:10:00",2,21.21,125
+"2020-12-21 14:00:00","2020-12-21 00:00:00",ABC,Exchange1,"2020-12-21 10:20:00",3,23.11,125
 "2020-12-21 15:00:00","2020-12-21 00:00:00",ABC,Exchange1,"2020-12-21 10:30:00",4,21.12,125
-"2020-12-21 12:00:00","2020-12-21 00:00:00",DEF,Exchange1,"2020-12-21 10:00:00",1,20.12,120
-"2020-12-21 13:00:00","2020-12-21 00:00:00",DEF,Exchange1,"2020-12-21 10:10:00",2,20.12,120
-"2020-12-21 14:00:00","2020-12-21 00:00:00",DEF,Exchange1,"2020-12-21 10:20:00",3,21.12,125
+"2020-12-21 12:00:00","2020-12-21 00:00:00",DEF,Exchange1,"2020-12-21 10:00:00",1,26.12,125
+"2020-12-21 13:00:00","2020-12-21 00:00:00",DEF,Exchange1,"2020-12-21 10:10:00",2,25.12,121
+"2020-12-21 14:00:00","2020-12-21 00:00:00",DEF,Exchange1,"2020-12-21 10:20:00",3,22.12,120
 "2020-12-21 15:00:00","2020-12-21 00:00:00",DEF,Exchange1,"2020-12-21 10:30:00",4,21.12,125
 
 ```
@@ -221,9 +228,14 @@ SQL statement:
 ```sql
 DROP TABLE IF EXISTS moving_avg_tb;
 CREATE TEMPORARY TABLE moving_avg_tb AS
-SELECT symbol, exchange, event_time, event_seq_num, trade_price,
-AVG(trade_price) OVER (PARTITION BY symbol ORDER BY event_time DESC 
-				 ROWS BETWEEN CURRENT ROW AND 2 FOLLOWING) AS running_avg
+SELECT trade_dt,
+       symbol, 
+       exchange, 
+       event_time, 
+       event_seq_num, 
+       trade_price,
+       AVG(trade_price) OVER (PARTITION BY symbol ORDER BY event_time
+				 ROWS BETWEEN 2 PRECEDING AND CURRENT ROW) AS running_avg
 FROM trade
 WHERE trade_dt = '2020-12-21'
 ;
@@ -232,28 +244,33 @@ WHERE trade_dt = '2020-12-21'
 An sample output of `t1`:
 
 ```
-symbol,exchange,event_time,event_seq_num,trade_price,running_avg
-ABC,Exchange1,"2020-12-21 10:30:00",4,21.12,20.786667505900066
-ABC,Exchange1,"2020-12-21 10:20:00",3,21.12,20.45333417256673
-ABC,Exchange1,"2020-12-21 10:10:00",2,20.12,20.1200008392334
-ABC,Exchange1,"2020-12-21 10:00:00",1,20.12,20.1200008392334
-DEF,Exchange1,"2020-12-21 10:30:00",4,21.12,20.786667505900066
-DEF,Exchange1,"2020-12-21 10:20:00",3,21.12,20.45333417256673
-DEF,Exchange1,"2020-12-21 10:10:00",2,20.12,20.1200008392334
-DEF,Exchange1,"2020-12-21 10:00:00",1,20.12,20.1200008392334
+trade_dt,symbol,exchange,event_time,event_seq_num,trade_price,running_avg
+"2020-12-21 00:00:00",ABC,Exchange1,"2020-12-21 10:00:00",1,24.12,24.1200008392334
+"2020-12-21 00:00:00",ABC,Exchange1,"2020-12-21 10:10:00",2,21.21,22.664999961853027
+"2020-12-21 00:00:00",ABC,Exchange1,"2020-12-21 10:20:00",3,23.11,22.81333351135254
+"2020-12-21 00:00:00",ABC,Exchange1,"2020-12-21 10:30:00",4,21.12,21.81333351135254
+"2020-12-21 00:00:00",DEF,Exchange1,"2020-12-21 10:00:00",1,26.12,26.1200008392334
+"2020-12-21 00:00:00",DEF,Exchange1,"2020-12-21 10:10:00",2,25.12,25.6200008392334
+"2020-12-21 00:00:00",DEF,Exchange1,"2020-12-21 10:20:00",3,22.12,24.45333417256673
+"2020-12-21 00:00:00",DEF,Exchange1,"2020-12-21 10:30:00",4,21.12,22.786667505900066
+
 ```
 
 * Step 3: Repeat step 1 and step 2 for ***the day before*** of the current day and save the result in a temp table `t2`.
 
 SQL statements:
 ```
-DROP TABLE IF EXISTS temp1
-CREATE TEMPORARY TABLE temp1 AS
-SELECT symbol, exchange, event_time, event_seq_num, trade_price,
-AVG(trade_price) OVER (PARTITION BY symbol ORDER BY event_time DESC 
-				 ROWS BETWEEN CURRENT ROW AND 2 FOLLOWING) AS last_pr
-                 FROM trade
-                 WHERE trade_dt = '2020-12-20'
+DROP TABLE IF EXISTS last_moving_avg_tb;
+CREATE TEMPORARY TABLE last_moving_avg_tb AS
+SELECT  symbol, 
+		exchange, 
+		event_time, 
+        event_seq_num, 
+        trade_price,
+		AVG(trade_price) OVER (PARTITION BY symbol ORDER BY event_time
+				 ROWS BETWEEN 2 PRECEDING AND CURRENT ROW) AS avg_pr
+FROM trade
+WHERE trade_dt = '2020-12-20'
 ;
 ```
 The output:
@@ -268,19 +285,61 @@ DEF,Exchange1,"2020-12-20 10:20:00",3,21.12,20.45333417256673
 DEF,Exchange1,"2020-12-20 10:10:00",2,20.12,20.1200008392334
 DEF,Exchange1,"2020-12-20 10:00:00",1,20.12,20.1200008392334
 ```
-* Step 4: Filtering out the neccessary columns in `t2`
-```
+
+Next, get the last avg moving price for each partition of symbol
+
+```sql
+DROP TABLE IF EXISTS last_moving_avg_tb;
 CREATE TEMPORARY TABLE last_moving_avg_tb AS
-SELECT symbol, exchange, last_pr
-FROM temp1;
+SELECT  symbol, 
+		exchange, 
+		event_time, 
+        event_seq_num, 
+        trade_price,
+		LAST_VALUE(avg_pr) 
+           OVER (PARTITION BY symbol 
+                 ORDER BY event_time
+                 RANGE BETWEEN
+                    UNBOUNDED PRECEDING AND
+                    UNBOUNDED FOLLOWING
+                 ) AS last_pr
+FROM prev_moving_avg_tb
+;
 ```
-The output is:
+The output:
 ```
+symbol,exchange,event_time,event_seq_num,trade_price,last_pr
+ABC,Exchange1,"2020-12-20 10:00:00",1,20.12,22.880000432332356
+ABC,Exchange1,"2020-12-20 10:10:00",2,22.32,22.880000432332356
+ABC,Exchange1,"2020-12-20 10:20:00",3,21.2,22.880000432332356
+ABC,Exchange1,"2020-12-20 10:30:00",4,25.12,22.880000432332356
+DEF,Exchange1,"2020-12-20 10:00:00",1,20.12,20.786667505900066
+DEF,Exchange1,"2020-12-20 10:10:00",2,20.12,20.786667505900066
+DEF,Exchange1,"2020-12-20 10:20:00",3,21.12,20.786667505900066
+DEF,Exchange1,"2020-12-20 10:30:00",4,21.12,20.786667505900066
+
 ```
 
 * Step 4: Load ***quote*** data for the current day into a temp view `v2`. Remind that the column in `v2` are: `arrival_time`, `trade_dt`, `symbol`, `exchange`, `event_time`, `event_seq_num`, `bid_price`, `bid_size`, `ask_price`, `ask_size`.
 
-* Union `t1` and `v2`
+```
+SELECT * FROM quote WHERE trade_dt = '2020-12-21';
+```
+
+The output:
+```
+arrival_time,trade_dt,symbol,exchange,event_time,event_seq_num,bid_price,bid_size,ask_price,ask_size
+"2020-12-21 12:00:00","2020-12-21 00:00:00",ABC,Exchange1,"2020-12-21 10:00:00",1,20.12,120,21.57,110
+"2020-12-21 13:00:00","2020-12-21 00:00:00",ABC,Exchange1,"2020-12-21 10:10:00",2,20.12,120,20.57,111
+"2020-12-21 14:00:00","2020-12-21 00:00:00",ABC,Exchange1,"2020-12-21 10:20:00",3,21.12,125,19.57,113
+"2020-12-21 15:00:00","2020-12-21 00:00:00",ABC,Exchange1,"2020-12-21 10:30:00",4,21.12,125,19.57,113
+"2020-12-21 12:00:00","2020-12-21 00:00:00",DEF,Exchange1,"2020-12-21 10:00:00",1,20.12,120,21.57,110
+"2020-12-21 13:00:00","2020-12-21 00:00:00",DEF,Exchange1,"2020-12-21 10:10:00",2,20.12,120,20.57,111
+"2020-12-21 14:00:00","2020-12-21 00:00:00",DEF,Exchange1,"2020-12-21 10:20:00",3,21.12,125,19.57,113
+"2020-12-21 15:00:00","2020-12-21 00:00:00",DEF,Exchange1,"2020-12-21 10:30:00",4,21.12,125,19.57,113
+```
+
+* Union `t1` and `v2` with the ***common schema***:
 
 Column | Value
 -------|---------
@@ -296,3 +355,52 @@ ask_pr | From quotes, null for trades
 ask_size | From quotes, null for trades
 trade_pr | From trades, null for quotes
 mov_avg_pr | From trades, null for quotes
+
+```
+DROP TABLE IF EXISTS quote_union;
+CREATE TABLE IF NOT EXISTS quote_union(
+trade_dt datetime,
+rec_type varchar(8),
+symbol varchar(8),
+event_time datetime,
+event_seq_num int NULL,
+exchange varchar(32),
+bid_price float NULL,
+bid_size int NULL,
+ask_price float NULL,
+ask_size int NULL,
+trade_price float NULL,
+mov_avg_pr float NULL
+);
+
+INSERT INTO quote_union (
+SELECT trade_dt, 'T', symbol, event_time, NULL, exchange, NULL, NULL, NULL, NULL, trade_price, running_avg
+FROM moving_avg_tb
+UNION
+SELECT trade_dt, 'Q', symbol, event_time, event_seq_num, exchange, bid_price, bid_size, ask_price, ask_size, NULL, NULL 
+FROM quote
+WHERE trade_dt = '2020-12-21'
+)
+;
+```
+
+The output:
+```
+trade_dt,rec_type,symbol,event_time,event_seq_num,exchange,bid_price,bid_size,ask_price,ask_size,trade_price,mov_avg_pr
+"2020-12-21 00:00:00",T,ABC,"2020-12-21 10:30:00",NULL,Exchange1,NULL,NULL,NULL,NULL,21.12,21.8133
+"2020-12-21 00:00:00",T,ABC,"2020-12-21 10:20:00",NULL,Exchange1,NULL,NULL,NULL,NULL,23.11,22.8133
+"2020-12-21 00:00:00",T,ABC,"2020-12-21 10:10:00",NULL,Exchange1,NULL,NULL,NULL,NULL,21.21,22.665
+"2020-12-21 00:00:00",T,ABC,"2020-12-21 10:00:00",NULL,Exchange1,NULL,NULL,NULL,NULL,24.12,24.12
+"2020-12-21 00:00:00",T,DEF,"2020-12-21 10:30:00",NULL,Exchange1,NULL,NULL,NULL,NULL,21.12,22.7867
+"2020-12-21 00:00:00",T,DEF,"2020-12-21 10:20:00",NULL,Exchange1,NULL,NULL,NULL,NULL,22.12,24.4533
+"2020-12-21 00:00:00",T,DEF,"2020-12-21 10:10:00",NULL,Exchange1,NULL,NULL,NULL,NULL,25.12,25.62
+"2020-12-21 00:00:00",T,DEF,"2020-12-21 10:00:00",NULL,Exchange1,NULL,NULL,NULL,NULL,26.12,26.12
+"2020-12-21 00:00:00",Q,ABC,"2020-12-21 10:00:00",1,Exchange1,20.12,120,21.57,110,NULL,NULL
+"2020-12-21 00:00:00",Q,ABC,"2020-12-21 10:10:00",2,Exchange1,20.12,120,20.57,111,NULL,NULL
+"2020-12-21 00:00:00",Q,ABC,"2020-12-21 10:20:00",3,Exchange1,21.12,125,19.57,113,NULL,NULL
+"2020-12-21 00:00:00",Q,ABC,"2020-12-21 10:30:00",4,Exchange1,21.12,125,19.57,113,NULL,NULL
+"2020-12-21 00:00:00",Q,DEF,"2020-12-21 10:00:00",1,Exchange1,20.12,120,21.57,110,NULL,NULL
+"2020-12-21 00:00:00",Q,DEF,"2020-12-21 10:10:00",2,Exchange1,20.12,120,20.57,111,NULL,NULL
+"2020-12-21 00:00:00",Q,DEF,"2020-12-21 10:20:00",3,Exchange1,21.12,125,19.57,113,NULL,NULL
+"2020-12-21 00:00:00",Q,DEF,"2020-12-21 10:30:00",4,Exchange1,21.12,125,19.57,113,NULL,NULL
+```
