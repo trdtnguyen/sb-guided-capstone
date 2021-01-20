@@ -32,6 +32,10 @@ Exchange | String
 ***Note:***
 * The ***bid price*** refers to the highest price a buyer will pay for a security.
 * The ***ask price*** refers to the lowest price a seller will accept for a security.
+For example, company A wants to purchase 1,000 shares of XYZ stock at $10, and company B wants to sell 1,500 shares of XYZ at $10.25. The spread is the difference between the asking price of $10.25 and the bid price of $10, or 25 cents.
+
+An individual investor looking at this spread would then know that, if they want to sell 1,000 shares, they could do so at $10 by selling to A. Conversely, the same investor would know that they could purchase 1,500 shares from B at $10.25. 
+
 
 ### Common Event (dimentional)
 Data models in Trade and Quote share some common columns. We combine them into one data model called Common Event as below:
