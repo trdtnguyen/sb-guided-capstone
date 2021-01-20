@@ -182,10 +182,10 @@ class Extract:
             .getOrCreate()
         logging.basicConfig(stream=sys.stdout, level=logging.INFO,
                                                     format='%(levelname)s - %(message)s')
-        PROJECT_PATH = os.path.join(os.path.dirname(__file__), "..")
+        self.PROJECT_PATH = os.path.join(os.path.dirname(__file__), "..")
         self.CONFIG = configparser.RawConfigParser()  # Use RawConfigParser() to read url with % character
         CONFIG_FILE = 'config.cnf'
-        config_path = os.path.join(PROJECT_PATH, CONFIG_FILE)
+        config_path = os.path.join(self.PROJECT_PATH, CONFIG_FILE)
         self.CONFIG.read(config_path)
 
 
@@ -206,7 +206,15 @@ class Extract:
         logging.info(f'{type(data)}')
         logging.info(data.printSchema())
         logging.info(data.show())
-        data.write.partitionBy('partition').mode('overwrite').parquet('output_dir')
+
+        output_dir = os.path.join(self.PROJECT_PATH, self.CONFIG['CORE']['PARTITION_PATH'])
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        parquet_write_mode = self.CONFIG['CORE']['PARQUET_WRITE_MODE']
+        partition_by=self.CONFIG['CORE']['PARTITION_LABEL']
+        # example: data.write.partitionBy('partition').mode('append').parquet('output_partitions')
+        data.write.partitionBy(partition_by).mode(parquet_write_mode).parquet(output_dir)
+
 
     """Extract data from data source
     filepath: path to the data file. If the file is on Azure store, the file path is:
@@ -222,8 +230,11 @@ class Extract:
         parsed = raw.map(lambda line: parse_json(line))
         data = self.spark.createDataFrame(parsed)
         logging.info(f'{type(data)}')
-        #data.write.partitionBy('partition').mode('overwrite').parquet('output_dir')
-        data.write.partitionBy('partition').mode('append').parquet('output_dir')
+
+        output_dir = self.CONFIG['CORE']['PARTITION_PATH']
+        parquet_write_mode = self.CONFIG['CORE']['PARQUET_WRITE_MODE']
+        partition_by = self.CONFIG['CORE']['PARTITION_LABEL']
+        data.write.partitionBy(partition_by).mode(parquet_write_mode).parquet(output_dir)
 
 e = Extract()
 # PROJECT_PATH = os.path.join(os.path.dirname(__file__), "..")
