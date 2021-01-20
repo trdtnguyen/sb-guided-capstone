@@ -4,13 +4,14 @@ Extract data sources
 __version__ = '0.1'
 __author__ = 'Dat Nguyen'
 
+import configparser
 from pyspark.sql import SparkSession
-from pyspark import SparkContext
 from models.CommonEvent import CommonEvent
 from datetime import datetime, timedelta
 import json
 import logging
 import sys
+import os
 """
 parse the CSV line to CommonEvent object
 format of CSV line:
@@ -35,11 +36,12 @@ def parse_csv(line: str) -> CommonEvent:
             trade_dt = datetime.strptime(record[0], '%Y-%m-%d')
             rec_type = record[1]
             symbol = record[2]
-            event_time = datetime.strptime(record[4], '%Y-%m-%d')
+            event_time = datetime.strptime(record[4], '%Y-%m-%d %H:%M')
             event_seq_num = int(record[5])
             exchange = record[6]
             #arrival_time = datetime.now()
             #arrival_time = arrival_time + timedelta(0,1,10) # days, seconds, miliseconds
+
             trade_price = float(record[7])
             trade_size = int(record[8])
             bid_price = 0.0
@@ -61,7 +63,7 @@ def parse_csv(line: str) -> CommonEvent:
             trade_dt = datetime.strptime(record[0], '%Y-%m-%d')
             rec_type = record[1]
             symbol = record[2]
-            event_time = datetime.strptime(record[3], '%Y-%m-%d')
+            event_time = datetime.strptime(record[3], '%Y-%m-%d %H:%M')
             event_seq_num = int(record[4])
             exchange = record[5]
             # To test the duplicate records, we increase 1 second for each later row
@@ -180,6 +182,11 @@ class Extract:
             .getOrCreate()
         logging.basicConfig(stream=sys.stdout, level=logging.INFO,
                                                     format='%(levelname)s - %(message)s')
+        PROJECT_PATH = os.path.join(os.path.dirname(__file__), "..")
+        self.CONFIG = configparser.RawConfigParser()  # Use RawConfigParser() to read url with % character
+        CONFIG_FILE = 'config.cnf'
+        config_path = os.path.join(PROJECT_PATH, CONFIG_FILE)
+        self.CONFIG.read(config_path)
 
 
     """Extract data from csv data source
@@ -219,4 +226,8 @@ class Extract:
         data.write.partitionBy('partition').mode('append').parquet('output_dir')
 
 e = Extract()
-e.extract_csv('walmart_stock.csv', 'key','value')
+# PROJECT_PATH = os.path.join(os.path.dirname(__file__), "..")
+PROJECT_PATH = e.CONFIG['CORE']['PROJECT_PATH']
+CSV_FILE = e.CONFIG['DATA']['SOURCE_DATA_FILE']
+CSV_FILE_PATH = os.path.join(PROJECT_PATH, CSV_FILE)
+e.extract_csv(CSV_FILE_PATH, 'key','value')
