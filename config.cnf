@@ -1,10 +1,14 @@
 [CORE]
 PROJECT_PATH=/home/dtn/sb-guided-capstone
 APP_NAME="Equity Market Data Analysis"
-PARTITION_PATH=output_partitions
-PARQUET_WRITE_MODE=append
-PARTITION_LABEL=partition
 
 [DATA]
-DAILY_DATA_PATH=daily_data
 SOURCE_DATA_FILE=stock.csv
+
+PARTITION_PATH=output_partitions
+#PARQUET_WRITE_MODE=append
+PARQUET_WRITE_MODE=overwrite
+PARTITION_LABEL=partition
+
+DAILY_DATA_PATH=daily_data
+DAILY_DATA_PREFIX=trade-dt

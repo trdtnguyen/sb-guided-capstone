@@ -118,9 +118,10 @@ def parse_json(line: str) -> CommonEvent:
             trade_dt = datetime.strptime(record[name_index[0]], '%Y-%m-%d')
             rec_type = record[name_index[1]]
             symbol = record[name_index[2]]
-            event_time = datetime.strptime(record[name_index[4]], '%Y-%m-%d')
+            event_time = datetime.strptime(record[name_index[4]], '%Y-%m-%d %H:%M')
             event_seq_num = int(record[name_index[5]])
             exchange = record[name_index[6]]
+            # arrival_time is the current time
             arrival_time = datetime.now()
             trade_price = float(record[name_index[7]])
             trade_size = int(record[name_index[8]])
@@ -145,9 +146,10 @@ def parse_json(line: str) -> CommonEvent:
             trade_dt = datetime.strptime(record[name_index[0]], '%Y-%m-%d')
             rec_type = record[name_index[1]]
             symbol = record[name_index[2]]
-            event_time = datetime.strptime(record[name_index[3]], '%Y-%m-%d')
+            event_time = datetime.strptime(record[name_index[3]], '%Y-%m-%d %H:%M')
             event_seq_num = int(record[name_index[4]])
             exchange = record[name_index[5]]
+            # arrival_time is the current time
             arrival_time = datetime.now()
             trade_price = 0.0
             trade_size = 0
@@ -207,11 +209,11 @@ class Extract:
         logging.info(data.printSchema())
         logging.info(data.show())
 
-        output_dir = os.path.join(self.PROJECT_PATH, self.CONFIG['CORE']['PARTITION_PATH'])
+        output_dir = os.path.join(self.PROJECT_PATH, self.CONFIG['DATA']['PARTITION_PATH'])
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
-        parquet_write_mode = self.CONFIG['CORE']['PARQUET_WRITE_MODE']
-        partition_by=self.CONFIG['CORE']['PARTITION_LABEL']
+        parquet_write_mode = self.CONFIG['DATA']['PARQUET_WRITE_MODE']
+        partition_by=self.CONFIG['DATA']['PARTITION_LABEL']
         # example: data.write.partitionBy('partition').mode('append').parquet('output_partitions')
         data.write.partitionBy(partition_by).mode(parquet_write_mode).parquet(output_dir)
 
@@ -231,9 +233,11 @@ class Extract:
         data = self.spark.createDataFrame(parsed)
         logging.info(f'{type(data)}')
 
-        output_dir = self.CONFIG['CORE']['PARTITION_PATH']
-        parquet_write_mode = self.CONFIG['CORE']['PARQUET_WRITE_MODE']
-        partition_by = self.CONFIG['CORE']['PARTITION_LABEL']
+        output_dir = self.CONFIG['DATA']['PARTITION_PATH']
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        parquet_write_mode = self.CONFIG['DATA']['PARQUET_WRITE_MODE']
+        partition_by = self.CONFIG['DATA']['PARTITION_LABEL']
         data.write.partitionBy(partition_by).mode(parquet_write_mode).parquet(output_dir)
 
 e = Extract()
