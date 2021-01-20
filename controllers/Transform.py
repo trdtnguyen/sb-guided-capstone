@@ -10,16 +10,22 @@ __version__ = '0.1'
 __author__ = 'Dat Nguyen'
 
 from pyspark.sql import SparkSession
-from pyspark import SparkContext
-import pyspark.sql.functions as F
-from models.CommonEvent import CommonEvent
-from datetime import datetime
-import json
+from datetime import datetime, timedelta
 import logging
+import os
 import sys
+import configparser
+
+
 class Transform:
     def __init__(self):
-        app_name = 'Equity Market Data Analysis'
+        self.PROJECT_PATH = os.path.join(os.path.dirname(__file__), "..")
+        self.CONFIG = configparser.RawConfigParser()  # Use RawConfigParser() to read url with % character
+        CONFIG_FILE = 'config.cnf'
+        config_path = os.path.join(self.PROJECT_PATH, CONFIG_FILE)
+        self.CONFIG.read(config_path)
+
+        app_name = self.CONFIG['CORE']['APP_NAME']
         self.spark = SparkSession \
                 .builder \
                 .master('local') \
@@ -28,70 +34,149 @@ class Transform:
         logging.basicConfig(stream=sys.stdout, level=logging.INFO,
                             format='%(levelname)s - %(message)s')
 
-    def create_trade_staging_table(self, basepath:str, date_str):
+    def create_trade_staging_table(self, in_date):
+        date_str = in_date.strftime('%Y-%m-%d')
+        #############
+        ##### Step 1. Read trade and quote data from daily_data for date_str
+        #############
+        daily_data_dir = os.path.join(self.PROJECT_PATH, self.CONFIG['DATA']['DAILY_DATA_PATH'])
+        prefix = self.CONFIG['DATA']['DAILY_DATA_PREFIX']
+        input_trade_sub_dir = 'trade'
+        input_quote_sub_dir = 'quote'
+        input_trade_dir = os.path.join(daily_data_dir, input_trade_sub_dir, f'{prefix}={date_str}')
+        input_quote_dir = os.path.join(daily_data_dir, input_quote_sub_dir, f'{prefix}={date_str}')
+
         #Read Trade Partition Dataset from the output of the previous stage
-        df = self.spark.read.parquet(f'{basepath}/trade/{date_str}')
-        df.createOrReplaceTempView("trades")
+        trade_df = self.spark.read.parquet(input_trade_dir)
+        quote_df = self.spark.read.parquet(input_quote_dir)
 
-        # Read trade table with necessary columns and save as a temp view
-        df = spark.sql(f"SELECT symbol, exchange, event_time, event_seq_num, trade price
-                       FROM trades
-                       WHERE trade_dt = {date_str}
-                       ")
-        df.createOrReplaceTempView("tmp_trade_moving_avg")
+        # sql_text = "SELECT symbol, exchange, event_time, event_seq_num, trade_price " + \
+        #            "FROM trades " + \
+        #            f"WHERE trade_dt = {date_str})"
+        # Reorder columns and filter out the date
+        trade_df.select(trade_df['trade_dt'], trade_df['symbol'], trade_df['exchange'], trade_df['event_time'], trade_df['event_seq_num'],
+                  trade_df['trade_price']).filter(trade_df['trade_dt'] == in_date)
+        # trade_df.show()
 
-        # Read trade table and compute the avg latest 30 minutes
-        moving_avg_df = self.spark.sql(f"
-                            SELECT symbol, exchange, event_time, event_seq_num, trade_price,
-                               AVG(trade_price) OVER (PARTITION BY symbol ORDER BY event_time DESC
-                               ROWS BETWEEN CURRENT ROW AND 29 FOLLOWING)  AS running_avg
-                            FROM tmp_trade_moving_avg
-                            ")
+
+        trade_df.createOrReplaceTempView("trades")
+        quote_df.createOrReplaceTempView('quotes')
+
+        #################
+        ##### Step 2. Compute average 30 minutes moving window trade price
+        #################
+        sql_text = "SELECT trade_dt, symbol, exchange, event_time, event_seq_num, trade_price, " + \
+                   "AVG(trade_price) OVER (PARTITION BY symbol ORDER BY event_time " + \
+                   "ROWS BETWEEN 2 PRECEDING AND CURRENT ROW) AS avg_trade_price " + \
+                   f"FROM trades;"
+        moving_avg_df = self.spark.sql(sql_text)
+        print('moving_avg_df: ==================')
+        # moving_avg_df.show()
+
+        #################
+        ##### Step 3. Compute last prices from trade_moving_avg_table
+        #################
         #Save the temp view into hive table for staging
-        moving_avg_df.write.saveAsTable("tmp_trade_moving_avg_table")
+        # moving_avg_df.write.saveAsTable("trade_moving_avg_table")
+        moving_avg_df.createOrReplaceTempView("trade_moving_avg_table")
 
-        #Get the previous date trade data
-        date = datetime.strptime(date_str, '%Y-%m-%d')
-        prev_date = date - timedelta(1,0,0) # days, seconds, millisecond
+        sql_text = "SELECT symbol, exchange, event_time, event_seq_num, trade_price, " + \
+            "LAST_VALUE(trade_price) " +\
+            "OVER (PARTITION BY symbol ORDER BY event_time " + \
+                   "RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS last_trade_price, " +\
+            "LAST_VALUE(avg_trade_price) " +\
+            "OVER (PARTITION BY symbol ORDER BY event_time " +\
+                    "RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS last_avg_trade_price " +\
+            "FROM trade_moving_avg_table"
+        last_moving_avg_df = self.spark.sql(sql_text)
+        # last_moving_avg_df.write.saveAsTable("last_trade_moving_avg_table")
+        last_moving_avg_df.createOrReplaceTempView("last_trade_moving_avg_table")
+        print('last_moving_avg_df: ==================')
+        last_moving_avg_df.show()
+        #################
+        ##### Step 4. Join last_moving_avg_df and quote
+        #################
+        print('====== quotes: ')
+        quote_df.show()
+        sql_text = "SELECT q.trade_dt, 'Q', q.symbol, q.event_time, q.event_seq_num, " +\
+            "q.exchange, q.bid_price, q.bid_size, q.ask_price, q.ask_size, " +\
+            "t. last_trade_price, t.last_avg_trade_price " +\
+            "FROM quotes as q, last_trade_moving_avg_table as t " +\
+            "WHERE q.symbol = t.symbol and q.event_time = t.event_time"
+        join_df = self.spark.sql(sql_text)
+        print('join_df: ==================')
+        join_df.show()
+        join_df.createOrReplaceTempView('join_tb')
+
+        #############
+        ##### Step 5. Get the previous date trade data and comptute the close price as
+        #### the last average moving trade price
+        #############
+        prev_date = in_date - timedelta(1,0,0) # days, seconds, millisecond
         prev_date_str = prev_date.strftime('%Y-%m-%d')
 
-        # Read Trade partition dataset
-        df = self.spark.read.parquet(f'{basepath}/trade/{prev_date_str}')
-        df.createOrReplaceTempView("prev_trades")
 
-        df = spark.sql(f"SELECT symbol, exchange, event_time, event_seq_num, trade price
-                       FROM prev_trades
-                       WHERE trade_dt = {prev_date_str}
-                       ")
-        # create a temp view
-        df.createOrReplaceTempView("tmp_last_trade")
-
-        # Read trade table and compute the avg latest 30 minutes
-        last_pr_df = spark.sql(f" SELECT symbol, exchange, last_pr FROM
-                               (SELECT symbol, exchange, event_time, event_seq_num, trade_price,
-                               AVG(trade_price) OVER (ORDER BY event_time DESC
-                               ROWS BETWEEN CURRENT ROW AND 29 FOLLOWING) AS last_pr
-                               FROM tmp_last_trade)
-                               ")
-        last_pr_df.write.saveAsTable("tmp_last_trade_table")
+        input_prev_trade_dir = os.path.join(daily_data_dir, input_trade_sub_dir, f'{prefix}={prev_date_str}')
 
 
-        # Read Quote partition dataset
-        # Remind that columns in quotes table are: arrival_time, trade_dt, symbol, exchange, event_time, event_seq_num, bid_price, bid_size, ask_price, ask_size
-        quote_df = self.spark.read.parquet(f'{basepath}/quote/{date_str}')
-        quote_df.createOrReplaceTempView("quotes")
-        # Filtering out the date
-        quote_df_filter = spark.sql(f"SELECT *
-                       FROM quotes
-                       WHERE trade_dt = {date_str}
-                       ")
-        quote_df_filter.createOrReplaceTempView("quotes_filtered")
-        # Union the quotes and tmp_trade_moving_avg_table
+        # Read Trade Partition Dataset from the output of the previous stage
+        prev_trade_df = self.spark.read.parquet(input_prev_trade_dir)
+        prev_trade_df.select(
+            prev_trade_df['trade_dt'], prev_trade_df['symbol'],
+            prev_trade_df['exchange'], prev_trade_df['event_time'],
+            prev_trade_df['event_seq_num'], prev_trade_df['trade_price'])\
+            .filter(prev_trade_df['trade_dt'] == prev_date)
+        # trade_df.show()
+        prev_trade_df.createOrReplaceTempView("prev_trades")
 
+        ###Compute average 30 minutes moving window trade price
+        sql_text = "SELECT trade_dt, symbol, exchange, event_time, event_seq_num, trade_price, " + \
+                   "AVG(trade_price) OVER (PARTITION BY symbol ORDER BY event_time " + \
+                   "ROWS BETWEEN 2 PRECEDING AND CURRENT ROW) AS avg_trade_price " + \
+                   f"FROM prev_trades;"
+        prev_moving_avg_df = self.spark.sql(sql_text)
 
+        ##Compute last prices from trade_moving_avg_table
 
+        #Save the temp view into hive table for staging
+        prev_moving_avg_df.createOrReplaceTempView("prev_trade_moving_avg_table")
 
+        sql_text = "SELECT symbol, exchange, " + \
+            "LAST_VALUE(avg_trade_price) " +\
+            "OVER (PARTITION BY symbol ORDER BY event_time " +\
+                    "RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS close_price " +\
+            "FROM prev_trade_moving_avg_table"
+        prev_last_moving_avg_df = self.spark.sql(sql_text)
+        # last_moving_avg_df.write.saveAsTable("last_trade_moving_avg_table")
+        prev_last_moving_avg_df.createOrReplaceTempView("prev_last_trade_moving_avg_table")
+
+        sql_text = "SELECT q.trade_dt, q.symbol, event_time, event_seq_num, q.exchange, " +\
+            "bid_price, bid_size, ask_price, ask_size, " +\
+            "last_trade_price, last_avg_trade_price, " +\
+            "bid_price - close_price as bid_pr_mv, " +\
+            "ask_price - close_price as ask_pr_mv " +\
+            "FROM join_tb as q, prev_last_trade_moving_avg_table as t " +\
+            "WHERE q.symbol = t.symbol and q.exchange = t.exchange"
+        final_df = self.spark.sql(sql_text)
+
+        #############
+        ##### Step 6. Write on the database
+        #############
+        analytic_data_dir = os.path.join(self.PROJECT_PATH, self.CONFIG['DATA']['ANALYTIC_DATA_PATH'])
+        if not os.path.exists(analytic_data_dir):
+            os.makedirs(analytic_data_dir)
+
+        prefix = self.CONFIG['DATA']['ANALYTIC_DATA_PREFIX']
+        output_dir = os.path.join(analytic_data_dir, f'{prefix}={date_str}')
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        print(f'Write data on {analytic_data_dir} ...', end = ' ')
+        final_df.write.mode('append').parquet(output_dir)
+        print('Done.')
 
 
 
 t = Transform()
+date = datetime(2021,1,2)
+t.create_trade_staging_table(date)
+

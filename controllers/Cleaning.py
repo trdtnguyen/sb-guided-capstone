@@ -159,6 +159,6 @@ trade_dir = f'{partition_by}=T' # 'partition=T'
 quote_dir = f'{partition_by}=Q' # 'partition=Q'
 
 trade_input_dir = os.path.join(partition_dir,trade_dir)
-quote_input_dir = os.path.join(partition_dir,trade_dir)
+quote_input_dir = os.path.join(partition_dir,quote_dir)
 c.data_correction_trade(trade_input_dir)
 c.data_correction_quote(quote_input_dir)
