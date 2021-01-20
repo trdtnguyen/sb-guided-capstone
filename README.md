@@ -29,6 +29,10 @@ Exchange | String
 ***Ask Price*** | Decimal
 ***Ask Size*** | Int
 
+***Note:***
+* The ***bid price*** refers to the highest price a buyer will pay for a security.
+* The ***ask price*** refers to the lowest price a seller will accept for a security.
+
 ### Common Event (dimentional)
 Data models in Trade and Quote share some common columns. We combine them into one data model called Common Event as below:
 Column | Type | Note
