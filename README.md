@@ -66,7 +66,11 @@ This project extract data from stock trades and stock quotes data source on MS A
  2020-01-01,Q,Symbol2,2020-11-23,4,Exchange1, 61,1301, 20, 58.231, 17
  2020-01-01,Q,Symbol2,2020-11-23,4,Exchange1, 61,1301, 20,
 ```
-Note that different record types (`T` for trade and `Q` for quote) have different line format.
+***Notes***
+* Different record types (`T` for trade and `Q` for quote) have different line format.
+* Trade row and quote row must share comon values on `exchange` column. In other words, intersect between `exchange` values in trade rows and `exchange` values in quote rows must be a non-empty set.
+
+
 ## Digestion Process
 This is the firs step in the project to extract data from datasources, cleaning and transform the data to parquet files using Apache Spark. The details are:
 * Although trade data and quote data have different format, they share common columns such as `TradeDate`, `RecordType`, `Symbol`, etc. So we create a dimentional table `CommonEvent` to combine both data type into one table.
