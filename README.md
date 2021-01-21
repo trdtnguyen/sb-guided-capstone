@@ -1,5 +1,44 @@
 # sb-guided-capstone
-Springboard guided capstone project
+This project implement a basic ETL pipeline used to acquire daily trade prices and quotes from stock market and analytic them based on the difference of the close prices of the previous day and the current day. 
+
+The project exploits Spark for extracting data source, cleaning, and transforming raw data to meaningful data that ready for analytic.
+
+This is a guided project from Springboard's Data Engineering career track.
+
+
+
+## Project Setup
+### Requirements
+
+***Standalone project without container:***
+* postgresql installed
+* python packages in requirements.txt
+* Spark installed and properly configued
+
+***Running on docker container***
+* docker and docker-compose installed
+
+### Database setup
+* Create database
+```
+$ createdb -h localhost -p 5432 -U postgres sbstock
+```
+* Create table
+```
+$ psql -h localhost -U postgres -d sbstock -f sql/create_table.sql
+```
+
+* JDBC connector setup
+This project has already provided the jar file for JDBC connector for Postgresql. In case you want to download a newer version than the provided one, follow step 1. Otherwise, skip step 1.
+* Step 1: Download JDBC connector for postgresql
+```
+$ cd jars
+$ wget https://jdbc.postgresql.org/download/postgresql-42.2.18.jar
+```
+* Step 2: Copy JDBC jar file to your spark jars
+```
+$ cp postgresql-42.2.18.jar $SPARK_HOME/jars/
+```
 
 ## Data Model
 ### Trade data (source)
