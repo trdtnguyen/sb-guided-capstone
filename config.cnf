@@ -1,12 +1,14 @@
 [CORE]
 PROJECT_PATH=/home/dtn/sb-guided-capstone
 APP_NAME="Equity Market Data Analysis"
+
 [DATABASE]
 HOST=localhost
 PORT=5432
 DATABASE=sbstock
-PG_USER=root
+PG_USER=postgres
 PG_PASSWORD=12345678
+JOB_TRACKER_TABLE_NAME=job_tracker
 
 [DATA]
 SOURCE_DATA_FILE=stock.csv
