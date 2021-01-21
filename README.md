@@ -1,7 +1,9 @@
 # sb-guided-capstone
-This project implement a basic ETL pipeline used to acquire daily trade prices and quotes from stock market and analytic them based on the difference of the close prices of the previous day and the current day.
+This project implement a basic ETL pipeline used to acquire daily trade prices and quotes from stock market and analytic them based on the difference of the close prices of the previous day and the current day. 
 
 The project exploits Spark for extracting data source, cleaning, and transforming raw data to meaningful data that ready for analytic.
+
+This is a guided project from Springboard's Data Engineering career track.
 
 
 
