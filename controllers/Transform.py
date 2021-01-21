@@ -9,7 +9,9 @@ Build an ETL job that calculates the following results for a given day
 __version__ = '0.1'
 __author__ = 'Dat Nguyen'
 
+from controllers.GlobalUtil import  GlobalUtil
 from pyspark.sql import SparkSession
+from pyspark.sql.functions import broadcast
 from datetime import datetime, timedelta
 import logging
 import os
@@ -18,21 +20,10 @@ import configparser
 
 
 class Transform:
-    def __init__(self):
-        self.PROJECT_PATH = os.path.join(os.path.dirname(__file__), "..")
-        self.CONFIG = configparser.RawConfigParser()  # Use RawConfigParser() to read url with % character
-        CONFIG_FILE = 'config.cnf'
-        config_path = os.path.join(self.PROJECT_PATH, CONFIG_FILE)
-        self.CONFIG.read(config_path)
+    def __init__(self, spark: SparkSession):
+        self.GU = GlobalUtil.instance()
+        self.spark = spark
 
-        app_name = self.CONFIG['CORE']['APP_NAME']
-        self.spark = SparkSession \
-                .builder \
-                .master('local') \
-                .appName(app_name) \
-                .getOrCreate()
-        logging.basicConfig(stream=sys.stdout, level=logging.INFO,
-                            format='%(levelname)s - %(message)s')
 
     def create_trade_staging_table(self, in_date):
         date_str = in_date.strftime('%Y-%m-%d')
@@ -98,11 +89,12 @@ class Transform:
         #################
         print('====== quotes: ')
         quote_df.show()
-        sql_text = "SELECT q.trade_dt, 'Q', q.symbol, q.event_time, q.event_seq_num, " +\
+        sql_text = "SELECT DISTINCT q.trade_dt, 'Q', q.symbol, q.event_time, q.event_seq_num, " +\
             "q.exchange, q.bid_price, q.bid_size, q.ask_price, q.ask_size, " +\
             "t. last_trade_price, t.last_avg_trade_price " +\
             "FROM quotes as q, last_trade_moving_avg_table as t " +\
-            "WHERE q.symbol = t.symbol and q.event_time = t.event_time"
+            "WHERE q.symbol = t.symbol"
+            # "WHERE q.symbol = t.symbol and q.event_time = t.event_time"
         join_df = self.spark.sql(sql_text)
         print('join_df: ==================')
         join_df.show()
@@ -141,7 +133,7 @@ class Transform:
         #Save the temp view into hive table for staging
         prev_moving_avg_df.createOrReplaceTempView("prev_trade_moving_avg_table")
 
-        sql_text = "SELECT symbol, exchange, " + \
+        sql_text = "SELECT DISTINCT symbol, exchange, " + \
             "LAST_VALUE(avg_trade_price) " +\
             "OVER (PARTITION BY symbol ORDER BY event_time " +\
                     "RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS close_price " +\
@@ -150,14 +142,40 @@ class Transform:
         # last_moving_avg_df.write.saveAsTable("last_trade_moving_avg_table")
         prev_last_moving_avg_df.createOrReplaceTempView("prev_last_trade_moving_avg_table")
 
-        sql_text = "SELECT q.trade_dt, q.symbol, event_time, event_seq_num, q.exchange, " +\
-            "bid_price, bid_size, ask_price, ask_size, " +\
-            "last_trade_price, last_avg_trade_price, " +\
-            "bid_price - close_price as bid_pr_mv, " +\
-            "ask_price - close_price as ask_pr_mv " +\
-            "FROM join_tb as q, prev_last_trade_moving_avg_table as t " +\
-            "WHERE q.symbol = t.symbol and q.exchange = t.exchange"
-        final_df = self.spark.sql(sql_text)
+        # Nornal join use spark.sql
+        # sql_text = "SELECT q.trade_dt, q.symbol, event_time, event_seq_num, q.exchange, " +\
+        #     "bid_price, bid_size, ask_price, ask_size, " +\
+        #     "last_trade_price, last_avg_trade_price, " +\
+        #     "bid_price - close_price as bid_pr_mv, " +\
+        #     "ask_price - close_price as ask_pr_mv " +\
+        #     "FROM join_tb as q, prev_last_trade_moving_avg_table as t " +\
+        #     "WHERE q.symbol = t.symbol and q.exchange = t.exchange"
+        # final_df = self.spark.sql(sql_text)
+
+        # broadcast join
+        prev_last_moving_avg_df.show()
+        join_cond = [join_df['symbol'] == prev_last_moving_avg_df['symbol'],
+                     join_df['exchange'] == prev_last_moving_avg_df['exchange']
+                     ]
+        final_df = join_df.join(prev_last_moving_avg_df,
+                                (join_df['symbol'] == prev_last_moving_avg_df['symbol']) &
+                                (join_df['exchange'] == prev_last_moving_avg_df['exchange'])
+                                )
+
+
+        # final_df = join_df.join(prev_last_moving_avg_df,
+        #                         (join_df['symbol'] == prev_last_moving_avg_df['symbol']) &
+        #                         (join_df['exchange'] == prev_last_moving_avg_df['exchange'])
+        #                         )\
+        #     .select(join_df['trade_dt'], join_df['symbol'], join_df['event_time'],
+        #             join_df['event_seq_num'], join_df['exchange'],
+        #             join_df['bid_price'], join_df['bid_size'], join_df['ask_price'], join_df['ask_size'] ,
+        #             join_df['last_trade_price'], join_df['last_avg_trade_price'],
+        #             (join_df['bid_price'] - prev_last_moving_avg_df['close_price']).alias('bid_pr_mv'),
+        #             (join_df['ask_price'] - prev_last_moving_avg_df['close_price']).alias('ask_pr_mv'),
+        #             ).distinct()
+        final_df.show()
+
 
         #############
         ##### Step 6. Write on the database
@@ -175,8 +193,17 @@ class Transform:
         print('Done.')
 
 
+### Self test
+GU = GlobalUtil.instance()
 
-t = Transform()
+app_name = GU.CONFIG['CORE']['APP_NAME']
+spark = SparkSession \
+    .builder \
+    .master('local') \
+    .appName(app_name) \
+    .getOrCreate()
+
+t = Transform(spark)
 date = datetime(2021,1,2)
 t.create_trade_staging_table(date)
 

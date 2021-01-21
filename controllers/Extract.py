@@ -4,6 +4,7 @@ Extract data sources
 __version__ = '0.1'
 __author__ = 'Dat Nguyen'
 
+from controllers.GlobalUtil import GlobalUtil
 import configparser
 from pyspark.sql import SparkSession
 from models.CommonEvent import CommonEvent
@@ -175,20 +176,9 @@ def parse_json(line: str) -> CommonEvent:
 
 
 class Extract:
-    def __init__(self):
-        app_name = 'Equity Market Data Analysis'
-        self.spark = SparkSession \
-            .builder \
-            .master('local') \
-            .appName(app_name) \
-            .getOrCreate()
-        logging.basicConfig(stream=sys.stdout, level=logging.INFO,
-                                                    format='%(levelname)s - %(message)s')
-        self.PROJECT_PATH = os.path.join(os.path.dirname(__file__), "..")
-        self.CONFIG = configparser.RawConfigParser()  # Use RawConfigParser() to read url with % character
-        CONFIG_FILE = 'config.cnf'
-        config_path = os.path.join(self.PROJECT_PATH, CONFIG_FILE)
-        self.CONFIG.read(config_path)
+    def __init__(self, spark: SparkSession):
+        self.GU = GlobalUtil.instance()
+        self.spark = spark
 
 
     """Extract data from csv data source
@@ -209,11 +199,11 @@ class Extract:
         logging.info(data.printSchema())
         logging.info(data.show())
 
-        output_dir = os.path.join(self.PROJECT_PATH, self.CONFIG['DATA']['PARTITION_PATH'])
+        output_dir = os.path.join(self.GU.PROJECT_PATH, self.GU.CONFIG['DATA']['PARTITION_PATH'])
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
-        parquet_write_mode = self.CONFIG['DATA']['PARQUET_WRITE_MODE']
-        partition_by=self.CONFIG['DATA']['PARTITION_LABEL']
+        parquet_write_mode = self.GU.CONFIG['DATA']['PARQUET_WRITE_MODE']
+        partition_by=self.GU.CONFIG['DATA']['PARTITION_LABEL']
         # example: data.write.partitionBy('partition').mode('append').parquet('output_partitions')
         data.write.partitionBy(partition_by).mode(parquet_write_mode).parquet(output_dir)
 
@@ -233,16 +223,16 @@ class Extract:
         data = self.spark.createDataFrame(parsed)
         logging.info(f'{type(data)}')
 
-        output_dir = self.CONFIG['DATA']['PARTITION_PATH']
+        output_dir = self.GU.CONFIG['DATA']['PARTITION_PATH']
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
-        parquet_write_mode = self.CONFIG['DATA']['PARQUET_WRITE_MODE']
-        partition_by = self.CONFIG['DATA']['PARTITION_LABEL']
+        parquet_write_mode = self.GU.CONFIG['DATA']['PARQUET_WRITE_MODE']
+        partition_by = self.GU.CONFIG['DATA']['PARTITION_LABEL']
         data.write.partitionBy(partition_by).mode(parquet_write_mode).parquet(output_dir)
 
 e = Extract()
 # PROJECT_PATH = os.path.join(os.path.dirname(__file__), "..")
-PROJECT_PATH = e.CONFIG['CORE']['PROJECT_PATH']
-CSV_FILE = e.CONFIG['DATA']['SOURCE_DATA_FILE']
-CSV_FILE_PATH = os.path.join(PROJECT_PATH, CSV_FILE)
+PROJECT_PATH = e.GU.CONFIG['CORE']['PROJECT_PATH']
+CSV_FILE = e.GU.CONFIG['DATA']['SOURCE_DATA_FILE']
+CSV_FILE_PATH = os.path.join(e.GU.PROJECT_PATH, CSV_FILE)
 e.extract_csv(CSV_FILE_PATH, 'key','value')
