@@ -62,13 +62,13 @@ class GlobalUtil(object):
         return df
 
     @classmethod
-    def write_to_db(cls, df, table_name, logger):
+    def write_to_db(cls, df, table_name, write_mode, logger):
         try:
             df.write.format('jdbc').options(
                 url=cls.JDBC_PG_URL,
                 dbtable=table_name,
                 user=cls.CONFIG['DATABASE']['PG_USER'],
-                password=cls.CONFIG['DATABASE']['PG_PASSWORD']).mode('append').save()
+                password=cls.CONFIG['DATABASE']['PG_PASSWORD']).mode(write_mode).save()
         except ValueError:
             logger.error(f'Error Query when extracting data for {table_name} table')
 
