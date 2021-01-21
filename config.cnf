@@ -1,6 +1,11 @@
 [CORE]
 PROJECT_PATH=/home/dtn/sb-guided-capstone
 APP_NAME="Equity Market Data Analysis"
+JOB_NAME_EXTRACT_CSV=extract_csv
+JOB_NAME_EXTRACT_JSON=extract_json
+JOB_NAME_CLEAN_TRADE=clean_trade
+JOB_NAME_CLEAN_QUOTE=clean_quote
+JOB_NAME_TRANSFORM=transform
 
 [DATABASE]
 HOST=localhost

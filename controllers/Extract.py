@@ -5,6 +5,7 @@ __version__ = '0.1'
 __author__ = 'Dat Nguyen'
 
 from controllers.GlobalUtil import GlobalUtil
+from controllers.Tracker import Tracker
 import configparser
 from pyspark.sql import SparkSession
 from models.CommonEvent import CommonEvent
@@ -189,23 +190,33 @@ class Extract:
     "fs.azure.account.key.<storage-account-name>.blob.core.windows.net"
     config_value: used when a file is on the cloud. If the file is on Azure store, the value is your account access key
     """
-    def extract_csv(self, filepath:str, config_key:str, config_value:str):
-        self.spark.conf.set(config_key, config_value)
-        raw = self.spark.sparkContext.textFile(filepath)
-        #raw = self.spark.read.csv(filepath, comment='#')
-        parsed = raw.map(lambda line: parse_csv(line))
-        data = self.spark.createDataFrame(parsed)
-        logging.info(f'{type(data)}')
-        logging.info(data.printSchema())
-        logging.info(data.show())
+    def extract_csv(self, filepath:str):
+        # job tracker
+        tracker = Tracker(self.GU.CONFIG['CORE']['JOB_NAME_EXTRACT_CSV'])
+        try:
+            raw = self.spark.sparkContext.textFile(filepath)
+            #raw = self.spark.read.csv(filepath, comment='#')
+            parsed = raw.map(lambda line: parse_csv(line))
+            data = self.spark.createDataFrame(parsed)
+            logging.info(f'{type(data)}')
+            logging.info(data.printSchema())
+            logging.info(data.show())
 
-        output_dir = os.path.join(self.GU.PROJECT_PATH, self.GU.CONFIG['DATA']['PARTITION_PATH'])
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-        parquet_write_mode = self.GU.CONFIG['DATA']['PARQUET_WRITE_MODE']
-        partition_by=self.GU.CONFIG['DATA']['PARTITION_LABEL']
-        # example: data.write.partitionBy('partition').mode('append').parquet('output_partitions')
-        data.write.partitionBy(partition_by).mode(parquet_write_mode).parquet(output_dir)
+            output_dir = os.path.join(self.GU.PROJECT_PATH, self.GU.CONFIG['DATA']['PARTITION_PATH'])
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir)
+            parquet_write_mode = self.GU.CONFIG['DATA']['PARQUET_WRITE_MODE']
+            partition_by=self.GU.CONFIG['DATA']['PARTITION_LABEL']
+            # example: data.write.partitionBy('partition').mode('append').parquet('output_partitions')
+            data.write.partitionBy(partition_by).mode(parquet_write_mode).parquet(output_dir)
+
+            tracker.update_job_status("success")
+        except Exception as e:
+            logging.error('Error on extract_csv')
+            print(e)
+
+            tracker.update_job_status("failed")
+
 
 
     """Extract data from data source
@@ -217,22 +228,39 @@ class Extract:
     config_value: used when a file is on the cloud. If the file is on Azure store, the value is your account access key
     """
     def extract_json(self, filepath:str, config_key:str, config_value:str):
-        self.spark.conf.set(config_key, config_value)
-        raw = self.spark.read.json(filepath)
-        parsed = raw.map(lambda line: parse_json(line))
-        data = self.spark.createDataFrame(parsed)
-        logging.info(f'{type(data)}')
+        tracker = Tracker(self.GU.CONFIG['CORE']['JOB_NAME_EXTRACT_JSON'])
 
-        output_dir = self.GU.CONFIG['DATA']['PARTITION_PATH']
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-        parquet_write_mode = self.GU.CONFIG['DATA']['PARQUET_WRITE_MODE']
-        partition_by = self.GU.CONFIG['DATA']['PARTITION_LABEL']
-        data.write.partitionBy(partition_by).mode(parquet_write_mode).parquet(output_dir)
+        try:
+            self.spark.conf.set(config_key, config_value)
+            raw = self.spark.read.json(filepath)
+            parsed = raw.map(lambda line: parse_json(line))
+            data = self.spark.createDataFrame(parsed)
+            logging.info(f'{type(data)}')
 
-e = Extract()
+            output_dir = self.GU.CONFIG['DATA']['PARTITION_PATH']
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir)
+            parquet_write_mode = self.GU.CONFIG['DATA']['PARQUET_WRITE_MODE']
+            partition_by = self.GU.CONFIG['DATA']['PARTITION_LABEL']
+            data.write.partitionBy(partition_by).mode(parquet_write_mode).parquet(output_dir)
+
+            tracker.update_job_status("success")
+        except Exception as e:
+            logging.error('Error on extract_csv')
+            print(e)
+
+            tracker.update_job_status("failed")
+
+# Self test
+GU = GlobalUtil.instance()
+spark = SparkSession \
+    .builder \
+    .master('local') \
+    .appName(GU.CONFIG['CORE']['APP_NAME']) \
+    .getOrCreate()
+e = Extract(spark)
 # PROJECT_PATH = os.path.join(os.path.dirname(__file__), "..")
-PROJECT_PATH = e.GU.CONFIG['CORE']['PROJECT_PATH']
-CSV_FILE = e.GU.CONFIG['DATA']['SOURCE_DATA_FILE']
+PROJECT_PATH = GU.CONFIG['CORE']['PROJECT_PATH']
+CSV_FILE = GU.CONFIG['DATA']['SOURCE_DATA_FILE']
 CSV_FILE_PATH = os.path.join(e.GU.PROJECT_PATH, CSV_FILE)
-e.extract_csv(CSV_FILE_PATH, 'key','value')
+e.extract_csv(CSV_FILE_PATH)
