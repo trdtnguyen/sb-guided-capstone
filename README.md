@@ -3,10 +3,12 @@ Springboard guided capstone project
 
 ## Project Setup
 ### Requirements
+
 ***Standalone project without container:***
 * postgresql installed
 * python packages in requirements.txt
 * Spark installed and properly configued
+
 ***Running on docker container***
 * docker and docker-compose installed
 
