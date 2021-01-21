@@ -1,6 +1,37 @@
 # sb-guided-capstone
 Springboard guided capstone project
 
+## Project Setup
+### Requirements
+***Standalone project without container:***
+* postgresql installed
+* python packages in requirements.txt
+* Spark installed and properly configued
+***Running on docker container***
+* docker and docker-compose installed
+
+### Database setup
+* Create database
+```
+$ createdb -h localhost -p 5432 -U postgres sbstock
+```
+* Create table
+```
+$ psql -h localhost -U postgres -d sbstock -f sql/create_table.sql
+```
+
+* JDBC connector setup
+This project has already provided the jar file for JDBC connector for Postgresql. In case you want to download a newer version than the provided one, follow step 1. Otherwise, skip step 1.
+* Step 1: Download JDBC connector for postgresql
+```
+$ cd jars
+$ wget https://jdbc.postgresql.org/download/postgresql-42.2.18.jar
+```
+* Step 2: Copy JDBC jar file to your spark jars
+```
+$ cp postgresql-42.2.18.jar $SPARK_HOME/jars/
+```
+
 ## Data Model
 ### Trade data (source)
 Column | Type
