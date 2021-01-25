@@ -30,9 +30,9 @@ class GlobalUtil(object):
     config_path = os.path.join(PROJECT_PATH, CONFIG_FILE)
     CONFIG.read(config_path)
 
-    JDBC_PG_URL = 'jdbc:postgresql://' + CONFIG['DATABASE']['HOST'] + ':' + \
-                     CONFIG['DATABASE']['PORT'] + '/' + \
-                     CONFIG['DATABASE']['DATABASE'] + '?' + \
+    JDBC_PG_URL = 'jdbc:postgresql://' + CONFIG['DATABASE']['PGHOST'] + ':' + \
+                     CONFIG['DATABASE']['PGPORT'] + '/' + \
+                     CONFIG['DATABASE']['PGDATABASE'] + '?' + \
                      'rewriteBatchedStatements=true'
     # DRIVER_NAME = 'com.mysql.cj.jdbc.Driver'
 
@@ -57,8 +57,8 @@ class GlobalUtil(object):
         df = spark.read.format('jdbc').options(
             url=cls.JDBC_PG_URL,
             dbtable=in_table_name,
-            user=cls.CONFIG['DATABASE']['PG_USER'],
-            password=cls.CONFIG['DATABASE']['PG_PASSWORD']).load()
+            user=cls.CONFIG['DATABASE']['PGUSER'],
+            password=cls.CONFIG['DATABASE']['PGPASSWORD']).load()
         return df
 
     @classmethod
@@ -67,8 +67,8 @@ class GlobalUtil(object):
             df.write.format('jdbc').options(
                 url=cls.JDBC_PG_URL,
                 dbtable=table_name,
-                user=cls.CONFIG['DATABASE']['PG_USER'],
-                password=cls.CONFIG['DATABASE']['PG_PASSWORD']).mode(write_mode).save()
+                user=cls.CONFIG['DATABASE']['PGUSER'],
+                password=cls.CONFIG['DATABASE']['PGPASSWORD']).mode(write_mode).save()
         except ValueError:
             logger.error(f'Error Query when extracting data for {table_name} table')
 

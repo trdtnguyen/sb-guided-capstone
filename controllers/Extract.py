@@ -192,7 +192,7 @@ class Extract:
     """
     def extract_csv(self, filepath:str):
         # job tracker
-        tracker = Tracker(self.GU.CONFIG['CORE']['JOB_NAME_EXTRACT_CSV'])
+        tracker = Tracker(self.GU.CONFIG['CORE']['JOB_NAME_EXTRACT_CSV'], self.spark)
         try:
             raw = self.spark.sparkContext.textFile(filepath)
             #raw = self.spark.read.csv(filepath, comment='#')
@@ -228,7 +228,7 @@ class Extract:
     config_value: used when a file is on the cloud. If the file is on Azure store, the value is your account access key
     """
     def extract_json(self, filepath:str, config_key:str, config_value:str):
-        tracker = Tracker(self.GU.CONFIG['CORE']['JOB_NAME_EXTRACT_JSON'])
+        tracker = Tracker(self.GU.CONFIG['CORE']['JOB_NAME_EXTRACT_JSON'], self.spark)
 
         try:
             self.spark.conf.set(config_key, config_value)
@@ -251,16 +251,15 @@ class Extract:
 
             tracker.update_job_status("failed")
 
-# Self test
-GU = GlobalUtil.instance()
-spark = SparkSession \
-    .builder \
-    .master('local') \
-    .appName(GU.CONFIG['CORE']['APP_NAME']) \
-    .getOrCreate()
-e = Extract(spark)
-# PROJECT_PATH = os.path.join(os.path.dirname(__file__), "..")
-PROJECT_PATH = GU.CONFIG['CORE']['PROJECT_PATH']
-CSV_FILE = GU.CONFIG['DATA']['SOURCE_DATA_FILE']
-CSV_FILE_PATH = os.path.join(e.GU.PROJECT_PATH, CSV_FILE)
-e.extract_csv(CSV_FILE_PATH)
+# # Self test
+# GU = GlobalUtil.instance()
+# spark = SparkSession \
+#     .builder \
+#     .master('local') \
+#     .appName(GU.CONFIG['CORE']['APP_NAME']) \
+#     .getOrCreate()
+# e = Extract(spark)
+# PROJECT_PATH = GU.CONFIG['CORE']['PROJECT_PATH']
+# CSV_FILE = GU.CONFIG['DATA']['SOURCE_DATA_FILE']
+# CSV_FILE_PATH = os.path.join(e.GU.PROJECT_PATH, 'data', CSV_FILE)
+# e.extract_csv(CSV_FILE_PATH)

@@ -8,16 +8,12 @@ import sys
 
 
 class Tracker(object):
-    def __init__(self, jobname):
+    def __init__(self, jobname, spark):
         self.jobname = jobname
         self.GU = GlobalUtil.instance()
 
-        app_name = self.GU.CONFIG['CORE']['APP_NAME']
-        self.spark = SparkSession \
-            .builder \
-            .master('local') \
-            .appName(app_name) \
-            .getOrCreate()
+
+        self.spark = spark
         logging.basicConfig(stream=sys.stdout, level=logging.INFO,
                             format='%(levelname)s - %(message)s')
         self.table_name = self.GU.CONFIG['DATABASE']['JOB_TRACKER_TABLE_NAME']
@@ -35,8 +31,8 @@ class Tracker(object):
                 job_id = df_filter.select(['job_id']).rdd.flatMap(lambda x: x).collect()[0]
                 self.is_new_id = False
                 return job_id
-        except Exception:
-            logging.error("Read database error in assign_job_id()")
+        except Exception as e:
+            logging.error("Read database error in assign_job_id()", e)
             return None
 
     def get_job_status(self, job_id: int):
@@ -44,8 +40,8 @@ class Tracker(object):
             df = self.GU.read_from_db(self.spark, self.table_name)
             status = df.filter(df['job_id'] == job_id).select(df['status']).rdd.flatMap(lambda x: x).collect()[0]
             return status
-        except Exception:
-            logging.error("Read database error in get_job_status()")
+        except Exception as e:
+            logging.error("Read database error in get_job_status()", e)
             return None
 
     def update_job_status(self, status: str):
@@ -79,14 +75,12 @@ class Tracker(object):
                 self.GU.write_to_db(df, self.table_name, 'overwrite', logging)
                 print('Done.')
 
-        except Exception:
-            logging.error("Read database error in get_job_status()")
+        except Exception as e:
+            logging.error("Read database error in get_job_status()", e)
 
-
-
-
-t = Tracker("job4")
-t.update_job_status("not ok")
-
-t2 = Tracker("job3")
-t2.update_job_status("not ok")
+# # Self test
+# t = Tracker("job4")
+# t.update_job_status("not ok")
+#
+# t2 = Tracker("job3")
+# t2.update_job_status("not ok")

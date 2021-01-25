@@ -26,7 +26,7 @@ class Cleaning:
 
 
     def data_correction_trade(self, filepath: str):
-        tracker = Tracker(self.GU.CONFIG['CORE']['JOB_NAME_CLEAN_TRADE'])
+        tracker = Tracker(self.GU.CONFIG['CORE']['JOB_NAME_CLEAN_TRADE'], self.spark)
         try:
             # Read Trade Partition Dataset from temporary location
             trade_common = self.spark.read.parquet(filepath)
@@ -88,7 +88,7 @@ class Cleaning:
             tracker.update_job_status("failed")
 
     def data_correction_quote(self, filepath: str):
-        tracker = Tracker(self.GU.CONFIG['CORE']['JOB_NAME_CLEAN_QUOTE'])
+        tracker = Tracker(self.GU.CONFIG['CORE']['JOB_NAME_CLEAN_QUOTE'], self.spark)
         try:
             # Read Trade Partition Dataset from temporary location
             quote_common = self.spark.read.parquet(filepath)
@@ -160,22 +160,22 @@ class Cleaning:
 
 
 ## self test
-GU = GlobalUtil.instance()
-
-app_name = GU.CONFIG['CORE']['APP_NAME']
-spark = SparkSession \
-    .builder \
-    .master('local') \
-    .appName(app_name) \
-    .getOrCreate()
-
-c = Cleaning(spark)
-partition_dir = os.path.join(c.GU.PROJECT_PATH, c.GU.CONFIG['DATA']['PARTITION_PATH'])
-partition_by = c.GU.CONFIG['DATA']['PARTITION_LABEL']
-trade_dir = f'{partition_by}=T'  # 'partition=T'
-quote_dir = f'{partition_by}=Q'  # 'partition=Q'
-
-trade_input_dir = os.path.join(partition_dir, trade_dir)
-quote_input_dir = os.path.join(partition_dir, quote_dir)
-c.data_correction_trade(trade_input_dir)
-c.data_correction_quote(quote_input_dir)
+# GU = GlobalUtil.instance()
+#
+# app_name = GU.CONFIG['CORE']['APP_NAME']
+# spark = SparkSession \
+#     .builder \
+#     .master('local') \
+#     .appName(app_name) \
+#     .getOrCreate()
+#
+# c = Cleaning(spark)
+# partition_dir = os.path.join(c.GU.PROJECT_PATH, c.GU.CONFIG['DATA']['PARTITION_PATH'])
+# partition_by = c.GU.CONFIG['DATA']['PARTITION_LABEL']
+# trade_dir = f'{partition_by}=T'  # 'partition=T'
+# quote_dir = f'{partition_by}=Q'  # 'partition=Q'
+#
+# trade_input_dir = os.path.join(partition_dir, trade_dir)
+# quote_input_dir = os.path.join(partition_dir, quote_dir)
+# c.data_correction_trade(trade_input_dir)
+# c.data_correction_quote(quote_input_dir)

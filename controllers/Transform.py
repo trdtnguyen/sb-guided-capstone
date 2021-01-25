@@ -28,7 +28,7 @@ class Transform:
 
 
     def create_trade_staging_table(self, in_date):
-        tracker = Tracker(self.GU.CONFIG['CORE']['JOB_NAME_TRANSFORM'])
+        tracker = Tracker(self.GU.CONFIG['CORE']['JOB_NAME_TRANSFORM'], self.spark)
 
         try:
             date_str = in_date.strftime('%Y-%m-%d')
@@ -205,17 +205,17 @@ class Transform:
             tracker.update_job_status("failed")
 
 
-### Self test
-GU = GlobalUtil.instance()
-
-app_name = GU.CONFIG['CORE']['APP_NAME']
-spark = SparkSession \
-    .builder \
-    .master('local') \
-    .appName(app_name) \
-    .getOrCreate()
-
-t = Transform(spark)
-date = datetime(2021,1,2)
-t.create_trade_staging_table(date)
+# ### Self test
+# GU = GlobalUtil.instance()
+#
+# app_name = GU.CONFIG['CORE']['APP_NAME']
+# spark = SparkSession \
+#     .builder \
+#     .master('local') \
+#     .appName(app_name) \
+#     .getOrCreate()
+#
+# t = Transform(spark)
+# date = datetime(2021,1,2)
+# t.create_trade_staging_table(date)
 

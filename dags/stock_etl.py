@@ -32,11 +32,13 @@ dag = DAG(
     default_args=WORKFLOW_DEFAULT_ARGS,
     catchup=False,
 )
-
 GU = GlobalUtil.instance()
+
+APP_NAME = GU.CONFIG['CORE']['APP_NAME']
+
 spark = SparkSession \
     .builder \
-    .appName(GU.CONFIG['CORE']['PROJECT_NAME']) \
+    .appName(APP_NAME) \
     .config("spark.sql.execution.arrow.pyspark.enabled", "true") \
     .getOrCreate()
 
@@ -44,7 +46,7 @@ PROJECT_PATH = GU.CONFIG['CORE']['PROJECT_PATH']
 # EXTRACT
 extract = Extract(spark)
 CSV_FILE = GU.CONFIG['DATA']['SOURCE_DATA_FILE']
-CSV_FILE_PATH = os.path.join(GU.PROJECT_PATH, CSV_FILE)
+CSV_FILE_PATH = os.path.join(GU.PROJECT_PATH, 'data', CSV_FILE)
 
 # CLEAN
 clean = Cleaning(spark)

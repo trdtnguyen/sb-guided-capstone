@@ -1,0 +1,52 @@
+services:
+    db:
+        image: postgres:latest
+        container_name: postgres_db
+        #hostname: postgres_db
+        restart: always
+        ports:
+            - "5432:5432"
+        env_file:
+            - config.cnf
+        environment: 
+            - POSTGRES_USER=postgres
+            - POSTGRES_PASSWORD=12345678
+            - POSTGRES_DB=sbstock
+              #- ALLOW_IP_RANGE=0.0.0.0/0
+              #- PGDATA=/data/postgres
+            - POSTGRES_HOST_AUTH_METHOD=trust
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U postgres"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 10s
+        networks:
+            - mynet
+        volumes:
+            - ./scripts/pg-init-scripts:/docker-entrypoint-initdb.d
+              #- /data/postgres
+    airflow-engine:
+        build: .
+        container_name: airflow
+        #command: /bin/sh -c "/root/airflow/setup.sh"
+        command: /bin/sh -c "/root/airflow/wait-for-it.sh db:5432 -- /root/airflow/setup.sh"
+        depends_on:
+            - db
+        init: true
+        ports:
+            - "8082:8080"
+        environment:
+            - PYTHONPATH=/root/airflow
+            - PROJECT_PATH=/root/airflow 
+        env_file:
+            - config.cnf
+        tty: true
+        networks:
+            - mynet
+        volumes:
+            - /root/airflow/
+networks:
+    mynet:
+volumes:
+    pgdata:
