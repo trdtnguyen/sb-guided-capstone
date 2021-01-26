@@ -9,13 +9,14 @@ JOB_NAME_TRANSFORM=transform
 
 [DATABASE]
 # detail on: https://www.postgresql.org/docs/10/libpq-envars.html
-PGHOST=192.168.0.2
-#PGHOST=db
-PGHOSTADDR=0.0.0.0
+#PGHOST=192.168.0.2
+PGHOST=postgres_db
+#PGHOSTADDR=0.0.0.0
+#PGHOSTADDR=postgres_db
 PGPORT=5432
 PGDATABASE=sbstock
 #PGUSER=postgres
-PGUSER=postgres1234
+PGUSER=postgres
 PGPASSWORD=12345678
 
 JOB_TRACKER_TABLE_NAME=job_tracker

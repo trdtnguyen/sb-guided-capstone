@@ -2,7 +2,7 @@ services:
     db:
         image: postgres:latest
         container_name: postgres_db
-        #hostname: postgres_db
+        hostname: postgres_db
         restart: always
         ports:
             - "5432:5432"
